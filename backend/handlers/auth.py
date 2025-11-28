@@ -5,6 +5,8 @@ from backend.schemas.auth import UserCreate, UserRead, Token, UserLogin, Refresh
 from backend.database import get_db
 from backend.crud.users import get_user_by_email, create_user
 from backend.service import auth as auth_service
+from backend.dependencies import get_current_user
+from backend.models import User
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -13,21 +15,41 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
     existing = await get_user_by_email(db, user_in.email)
     if existing:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
 
     hashed = auth_service.get_password_hash(user_in.password)
-    user = await create_user(db, email=user_in.email, hashed_password=hashed, role=user_in.role or "observer")
-    return UserRead.from_orm(user)
+    user = await create_user(
+        db,
+        email=user_in.email,
+        hashed_password=hashed,
+        role=user_in.role or "observer"
+    )
+    return UserRead.model_validate(user)
 
 
 @router.post("/login", response_model=Token)
 async def login(form_data: UserLogin, db: AsyncSession = Depends(get_db)):
     user = await get_user_by_email(db, form_data.email)
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials"
+        )
 
     if not auth_service.verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid credentials"
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is disabled"
+        )
 
     access_token = auth_service.create_access_token(subject=str(user.id))
     refresh_token = auth_service.create_refresh_token(subject=str(user.id))
@@ -36,25 +58,55 @@ async def login(form_data: UserLogin, db: AsyncSession = Depends(get_db)):
 
 @router.post("/refresh", response_model=Token)
 async def refresh_token(payload: RefreshTokenRequest, db: AsyncSession = Depends(get_db)):
+    from backend.crud.users import get_user_by_id
+
     data = auth_service.decode_token(payload.refresh_token)
     if not data or "sub" not in data:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token"
+        )
 
-    # get user by id
     try:
-        from sqlalchemy import select
-        from backend.models import User
-        sub = data.get("sub")
-        user_id = int(sub)
-        q = await db.execute(select(User).where(User.id == user_id))
-        user = q.scalars().first()
-    except Exception:
-        user = None
+        user_id = int(data["sub"])
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload"
+        )
+
+    user = await get_user_by_id(db, user_id)
 
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found"
+        )
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User account is disabled"
+        )
 
     access_token = auth_service.create_access_token(subject=str(user.id))
-    refresh_token = auth_service.create_refresh_token(subject=str(user.id))
-    return Token(access_token=access_token, refresh_token=refresh_token)
+    new_refresh_token = auth_service.create_refresh_token(subject=str(user.id))
+    return Token(access_token=access_token, refresh_token=new_refresh_token)
 
+
+@router.get("/me", response_model=UserRead)
+async def get_me(current_user: User = Depends(get_current_user)):
+
+    return UserRead.model_validate(current_user)
+
+
+@router.get("/me", response_model=UserRead)
+async def get_current_user_info(
+        current_user: User = Depends(get_current_user)
+):
+    return UserRead.model_validate(current_user)
+
+
+@router.post("/logout")
+async def logout(current_user: User = Depends(get_current_user)):
+    return {"detail": "Successfully logged out"}
