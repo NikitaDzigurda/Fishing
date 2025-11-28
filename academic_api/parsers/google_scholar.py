@@ -1,5 +1,6 @@
 """
 Парсер Google Scholar через scholarly
+С полным парсингом авторов статей и описаний
 """
 
 import re
@@ -9,8 +10,8 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Optional
 from enum import Enum
+from tqdm import tqdm
 
-# pip install scholarly
 from scholarly import scholarly, ProxyGenerator
 
 from ..base import BaseParser, ProgressCallback
@@ -31,9 +32,14 @@ class GoogleScholarParser(BaseParser):
     """
     Парсер Google Scholar через scholarly
 
+    ВАЖНО: fill_publications=True обязателен для получения авторов публикаций!
+
     Пример:
-        async with GoogleScholarParser(proxy_type=ProxyType.FREE) as parser:
-            profile = await parser.get_author_profile(author_id="JicYPdAAAAAJ")
+        async with GoogleScholarParser() as parser:
+            profile = await parser.get_author_profile(
+                author_id="JicYPdAAAAAJ",
+                fill_publications=True  # Нужно для авторов!
+            )
     """
 
     source = SourceType.GOOGLE_SCHOLAR
@@ -52,7 +58,8 @@ class GoogleScholarParser(BaseParser):
         self._proxy_setup_done = False
 
     async def init(self):
-        await self._setup_proxy()
+        if self.proxy_type != ProxyType.NONE:
+            await self._setup_proxy()
 
     async def close(self):
         self._executor.shutdown(wait=False)
@@ -91,26 +98,94 @@ class GoogleScholarParser(BaseParser):
             lambda: func(*args, **kwargs)
         )
 
+    def _parse_authors_from_string(self, authors_str: str) -> list[Author]:
+        """
+        Парсинг строки авторов в список объектов Author
+
+        Форматы:
+        - "Alex Krizhevsky and Ilya Sutskever and Geoffrey E Hinton"
+        - "Yann LeCun and Yoshua Bengio and Geoffrey Hinton"
+        """
+        if not authors_str:
+            return []
+
+        authors = []
+
+        # Разделяем по " and "
+        parts = authors_str.split(" and ")
+
+        for part in parts:
+            name = part.strip()
+            if not name:
+                continue
+
+            # Убираем лишние пробелы
+            name = re.sub(r'\s+', ' ', name)
+
+            authors.append(Author(
+                name=name,
+                source=SourceType.GOOGLE_SCHOLAR
+            ))
+
+        return authors
+
     def _parse_publication(self, pub_dict: dict) -> Publication:
-        """Преобразование публикации scholarly в Publication"""
+        """
+        Преобразование публикации scholarly в Publication
+
+        ВАЖНО: pub_dict должен быть после scholarly.fill() для получения авторов!
+        """
         bib = pub_dict.get("bib", {})
 
-        # Авторы
-        authors_raw = bib.get("author", "")
-        if isinstance(authors_raw, str):
-            author_names = [a.strip() for a in authors_raw.split(" and ")]
-        else:
-            author_names = authors_raw
+        # === АВТОРЫ (появляются только после fill) ===
+        authors = []
+        authors_str = bib.get("author", "")
 
-        authors = [Author(name=name, source=SourceType.GOOGLE_SCHOLAR) for name in author_names]
+        if authors_str:
+            authors = self._parse_authors_from_string(authors_str)
 
-        # Год
+        # === ГОД ===
         year = None
-        if bib.get("pub_year"):
+        pub_year = bib.get("pub_year")
+        if pub_year:
             try:
-                year = int(bib["pub_year"])
+                year = int(pub_year)
             except (ValueError, TypeError):
                 pass
+
+        # === ABSTRACT (появляется только после fill) ===
+        abstract = bib.get("abstract")
+
+        # === VENUE ===
+        venue = (
+            bib.get("journal") or
+            bib.get("venue") or
+            bib.get("booktitle") or
+            bib.get("conference")
+        )
+
+        # === ДОПОЛНИТЕЛЬНЫЕ ПОЛЯ ===
+        publisher = bib.get("publisher")
+        volume = bib.get("volume")
+        issue = bib.get("number")
+        pages = bib.get("pages")
+
+        # === EXTERNAL IDS ===
+        external_ids = ExternalIds()
+
+        # Пробуем найти DOI
+        pub_url = pub_dict.get("pub_url", "")
+        if "doi.org" in pub_url:
+            doi_match = re.search(r'doi\.org/(.+?)(?:\?|$)', pub_url)
+            if doi_match:
+                external_ids.doi = doi_match.group(1)
+
+        # arXiv
+        eprint_url = pub_dict.get("eprint_url", "") or ""
+        if "arxiv.org" in eprint_url:
+            arxiv_match = re.search(r'arxiv\.org/(?:abs|pdf)/([^\s/?]+)', eprint_url)
+            if arxiv_match:
+                external_ids.arxiv_id = arxiv_match.group(1).replace(".pdf", "")
 
         return Publication(
             title=bib.get("title", "Unknown"),
@@ -118,12 +193,13 @@ class GoogleScholarParser(BaseParser):
             year=year,
             source=SourceType.GOOGLE_SCHOLAR,
             source_id=pub_dict.get("author_pub_id"),
-            abstract=bib.get("abstract"),
-            venue=bib.get("venue") or bib.get("journal") or bib.get("booktitle"),
-            publisher=bib.get("publisher"),
-            volume=bib.get("volume"),
-            issue=bib.get("number"),
-            pages=bib.get("pages"),
+            external_ids=external_ids,
+            abstract=abstract,
+            venue=venue,
+            publisher=publisher,
+            volume=volume,
+            issue=issue,
+            pages=pages,
             citation_count=pub_dict.get("num_citations", 0),
             url=pub_dict.get("pub_url"),
             pdf_url=pub_dict.get("eprint_url"),
@@ -141,20 +217,56 @@ class GoogleScholarParser(BaseParser):
             except (ValueError, TypeError):
                 pass
 
-        # Соавторы
-        coauthors = []
+        # === СОАВТОРЫ ИЗ ПРОФИЛЯ ===
+        coauthors_from_profile = {}
         for c in author_dict.get("coauthors", []):
+            name = c.get("name", "")
+            if name:
+                coauthors_from_profile[name.lower()] = CoAuthor(
+                    author=Author(
+                        name=name,
+                        author_id=c.get("scholar_id"),
+                        affiliation=c.get("affiliation"),
+                        source=SourceType.GOOGLE_SCHOLAR
+                    ),
+                    collaboration_count=0
+                )
+
+        # === СЧИТАЕМ КОЛЛАБОРАЦИИ ИЗ ПУБЛИКАЦИЙ ===
+        author_name_lower = author_dict.get("name", "").lower()
+        coauthor_counts: dict[str, int] = {}
+        coauthor_objects: dict[str, Author] = {}
+
+        for pub in publications:
+            for author in pub.authors:
+                name_lower = author.name.lower()
+                if name_lower != author_name_lower and name_lower:
+                    if name_lower not in coauthor_counts:
+                        coauthor_counts[name_lower] = 0
+                        coauthor_objects[name_lower] = author
+                    coauthor_counts[name_lower] += 1
+
+        # === ОБЪЕДИНЯЕМ СОАВТОРОВ ===
+        coauthors = []
+
+        # Сначала добавляем из профиля с подсчитанными коллаборациями
+        for name_lower, coauthor in coauthors_from_profile.items():
+            coauthor.collaboration_count = coauthor_counts.get(name_lower, 0)
+            coauthors.append(coauthor)
+            # Убираем из подсчитанных
+            coauthor_counts.pop(name_lower, None)
+
+        # Добавляем оставшихся (не было в профиле)
+        for name_lower, count in coauthor_counts.items():
             coauthors.append(CoAuthor(
-                author=Author(
-                    name=c.get("name", ""),
-                    author_id=c.get("scholar_id"),
-                    affiliation=c.get("affiliation"),
-                    source=SourceType.GOOGLE_SCHOLAR
-                ),
-                collaboration_count=0
+                author=coauthor_objects[name_lower],
+                collaboration_count=count
             ))
 
-        # Публикации по годам
+        # Сортируем по коллаборациям
+        coauthors.sort(key=lambda x: -x.collaboration_count)
+
+        # === ПУБЛИКАЦИИ ПО ГОДАМ ===
         pubs_per_year: dict[int, int] = {}
         for pub in publications:
             if pub.year:
@@ -231,9 +343,15 @@ class GoogleScholarParser(BaseParser):
             query: str,
             limit: int = 20,
             year_start: Optional[int] = None,
-            year_end: Optional[int] = None
+            year_end: Optional[int] = None,
+            fill_details: bool = True
     ) -> list[Publication]:
-        """Поиск публикаций"""
+        """
+        Поиск публикаций
+
+        Args:
+            fill_details: True для получения авторов и abstract (медленнее)
+        """
         await self._delay()
 
         def search():
@@ -250,7 +368,18 @@ class GoogleScholarParser(BaseParser):
             return results
 
         pubs = await self._run_sync(search)
-        return [self._parse_publication(p) for p in pubs]
+
+        publications = []
+        for pub in pubs:
+            if fill_details:
+                await self._delay()
+                try:
+                    pub = await self._run_sync(scholarly.fill, pub)
+                except Exception:
+                    pass
+            publications.append(self._parse_publication(pub))
+
+        return publications
 
     async def get_publication(self, publication_id: str) -> Publication:
         """Получить публикацию (не поддерживается напрямую)"""
@@ -264,15 +393,27 @@ class GoogleScholarParser(BaseParser):
             fill_publications: bool = True,
             progress_callback: Optional[ProgressCallback] = None
     ) -> AuthorProfile:
-        """Получить полный профиль автора"""
+        """
+        Получить полный профиль автора
 
-        # Определяем ID
+        Args:
+            author_id: Google Scholar ID (например "JicYPdAAAAAJ")
+            author_name: Имя для поиска
+            author_url: URL профиля
+            fill_publications: True для получения авторов и abstract каждой публикации
+                               ОБЯЗАТЕЛЬНО True если нужны авторы публикаций!
+            progress_callback: Callback прогресса
+
+        Returns:
+            AuthorProfile с публикациями
+        """
+
+        # === ОПРЕДЕЛЯЕМ ID ===
         if author_url:
             parsed = self.parse_url(author_url)
             author_id = parsed.get("author_id")
 
         if not author_id and author_name:
-            # Поиск по имени
             authors = await self.search_authors(author_name, limit=1)
             if authors:
                 author_id = authors[0].source_id
@@ -282,7 +423,7 @@ class GoogleScholarParser(BaseParser):
 
         await self._delay()
 
-        # Загружаем автора
+        # === ЗАГРУЖАЕМ АВТОРА ===
         def fetch_author():
             author = scholarly.search_author_id(author_id)
             author = scholarly.fill(author, sections=[
@@ -295,31 +436,38 @@ class GoogleScholarParser(BaseParser):
 
         author_dict = await self._run_sync(fetch_author)
 
-        # Заполняем публикации
+        # === ЗАГРУЖАЕМ ПУБЛИКАЦИИ ===
         publications = []
         raw_pubs = author_dict.get("publications", [])
+        total = len(raw_pubs)
 
-        if fill_publications and raw_pubs:
-            total = len(raw_pubs)
+        if progress_callback:
+            await progress_callback(f"Found {total} publications", 0)
 
-            for i, pub in enumerate(raw_pubs):
+        for i, pub in tqdm(enumerate(raw_pubs), total=len(raw_pubs)):
+
+            if fill_publications:
+                # ОБЯЗАТЕЛЬНО для получения авторов и abstract!
                 await self._delay()
 
-                def fill_pub(p):
-                    try:
-                        return scholarly.fill(p)
-                    except:
-                        return p
+                try:
+                    filled_pub = await self._run_sync(scholarly.fill, pub)
+                except Exception as e:
+                    # Если не удалось - используем как есть (без авторов)
+                    filled_pub = pub
 
-                filled = await self._run_sync(fill_pub, pub)
-                publications.append(self._parse_publication(filled))
+                publications.append(self._parse_publication(filled_pub))
+            else:
+                # Без fill - авторов и abstract НЕ БУДЕТ!
+                publications.append(self._parse_publication(pub))
 
-                if progress_callback:
-                    await progress_callback(f"Publications: {i + 1}/{total}", i + 1)
-        else:
-            publications = [self._parse_publication(p) for p in raw_pubs]
+            if progress_callback:
+                await progress_callback(f"Publications: {i + 1}/{total}", i + 1)
 
-        # Сортируем по году
-        publications.sort(key=lambda x: x.year or 0, reverse=True)
+        # Сортируем по цитированиям (самые цитируемые первыми)
+        publications.sort(key=lambda x: -(x.citation_count or 0))
+
+        if progress_callback:
+            await progress_callback("Done!", total)
 
         return self._parse_author_profile(author_dict, publications)

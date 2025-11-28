@@ -38,11 +38,45 @@ class SemanticScholarParser(BaseParser):
     BASE_URL = "https://api.semanticscholar.org/graph/v1"
 
     # Лимиты
-    RATE_LIMIT_NO_KEY = 3.5  # ~100 запросов в 5 минут = 1 запрос в 3 сек
+    RATE_LIMIT_NO_KEY = 3.5
     RATE_LIMIT_WITH_KEY = 1.0
-    BATCH_SIZE = 100  # Максимум публикаций за запрос
+    BATCH_SIZE = 100
     MAX_RETRIES = 3
-    RETRY_DELAY = 10  # Начальная задержка при 429
+    RETRY_DELAY = 10
+
+    # Поля для запросов публикаций (включая abstract)
+    PAPER_FIELDS = ",".join([
+        "title",
+        "authors",
+        "year",
+        "venue",
+        "publicationVenue",
+        "citationCount",
+        "referenceCount",
+        "influentialCitationCount",
+        "abstract",  # <-- ABSTRACT
+        "externalIds",
+        "url",
+        "openAccessPdf",
+        "isOpenAccess",
+        "s2FieldsOfStudy",
+        "publicationTypes",
+        "publicationDate"
+    ])
+
+    # Поля для поиска публикаций
+    SEARCH_PAPER_FIELDS = ",".join([
+        "title",
+        "authors",
+        "year",
+        "venue",
+        "citationCount",
+        "abstract",  # <-- ABSTRACT
+        "externalIds",
+        "url",
+        "openAccessPdf",
+        "isOpenAccess"
+    ])
 
     def __init__(self, api_key: Optional[str] = None):
         super().__init__()
@@ -79,10 +113,9 @@ class SemanticScholarParser(BaseParser):
 
         try:
             async with self._session.get(url, params=params) as response:
-                # Rate limit
                 if response.status == 429:
                     if retries < self.MAX_RETRIES:
-                        delay = self.RETRY_DELAY * (2 ** retries)  # Экспоненциальная задержка
+                        delay = self.RETRY_DELAY * (2 ** retries)
                         print(f"\n⚠️  Rate limit hit. Waiting {delay}s...")
                         await asyncio.sleep(delay)
                         return await self._get(endpoint, params, retries + 1)
@@ -102,6 +135,7 @@ class SemanticScholarParser(BaseParser):
     def _parse_publication(self, data: dict) -> Publication:
         """Преобразование данных S2 в Publication"""
 
+        # === АВТОРЫ ===
         authors = [
             Author(
                 name=a.get("name", ""),
@@ -111,6 +145,7 @@ class SemanticScholarParser(BaseParser):
             for a in data.get("authors", [])
         ]
 
+        # === EXTERNAL IDS ===
         ext_ids = data.get("externalIds") or {}
         external_ids = ExternalIds(
             doi=ext_ids.get("DOI"),
@@ -119,26 +154,52 @@ class SemanticScholarParser(BaseParser):
             semantic_scholar_id=data.get("paperId")
         )
 
-        # Поля исследования
+        # === ПОЛЯ ИССЛЕДОВАНИЯ ===
         fields = []
         for f in data.get("s2FieldsOfStudy", []):
             if f.get("category"):
                 fields.append(f["category"])
 
+        # === VENUE ===
+        venue = data.get("venue") or ""
+        publication_venue = data.get("publicationVenue") or {}
+        if not venue and publication_venue:
+            venue = publication_venue.get("name", "")
+
+        # Тип venue
+        venue_type = None
+        pub_types = data.get("publicationTypes") or []
+        if pub_types:
+            venue_type = pub_types[0]  # Journal, Conference, etc.
+
+        # === ДАТА ===
+        year = data.get("year")
+        publication_date = data.get("publicationDate")  # "2023-05-15"
+
+        # === ABSTRACT ===
+        abstract = data.get("abstract")  # <-- ПАРСИМ ABSTRACT
+
+        # === PDF ===
+        pdf_url = None
+        open_access_pdf = data.get("openAccessPdf")
+        if open_access_pdf:
+            pdf_url = open_access_pdf.get("url")
+
         return Publication(
             title=data.get("title", ""),
             authors=authors,
-            year=data.get("year"),
+            year=year,
             source=SourceType.SEMANTIC_SCHOLAR,
             source_id=data.get("paperId"),
             external_ids=external_ids,
-            abstract=data.get("abstract"),
-            venue=data.get("venue"),
+            abstract=abstract,  # <-- ABSTRACT
+            venue=venue,
+            venue_type=venue_type,
             citation_count=data.get("citationCount", 0),
             reference_count=data.get("referenceCount", 0),
             influential_citation_count=data.get("influentialCitationCount", 0),
             url=data.get("url"),
-            pdf_url=data.get("openAccessPdf", {}).get("url") if data.get("openAccessPdf") else None,
+            pdf_url=pdf_url,
             is_open_access=data.get("isOpenAccess", False),
             fields_of_study=fields,
             raw_data=data
@@ -176,11 +237,11 @@ class SemanticScholarParser(BaseParser):
         year_start: Optional[int] = None,
         year_end: Optional[int] = None
     ) -> list[Publication]:
-        """Поиск публикаций"""
+        """Поиск публикаций (с abstract)"""
         params = {
             "query": query,
             "limit": min(limit, 100),
-            "fields": "title,authors,year,venue,citationCount,abstract,externalIds,url,openAccessPdf"
+            "fields": self.SEARCH_PAPER_FIELDS  # Включает abstract
         }
 
         if year_start or year_end:
@@ -193,12 +254,12 @@ class SemanticScholarParser(BaseParser):
             params["year"] = year_filter
 
         data = await self._get("paper/search", params)
+        print(data)
         return [self._parse_publication(p) for p in data.get("data", [])]
 
     async def get_publication(self, publication_id: str) -> Publication:
-        """Получить публикацию по ID"""
-        fields = "title,authors,year,venue,citationCount,referenceCount,abstract,externalIds,url,openAccessPdf,isOpenAccess,s2FieldsOfStudy"
-        data = await self._get(f"paper/{publication_id}", {"fields": fields})
+        """Получить публикацию по ID (с полным abstract)"""
+        data = await self._get(f"paper/{publication_id}", {"fields": self.PAPER_FIELDS})
         return self._parse_publication(data)
 
     async def _get_author_papers_paginated(
@@ -206,11 +267,27 @@ class SemanticScholarParser(BaseParser):
         author_id: str,
         progress_callback: Optional[ProgressCallback] = None
     ) -> list[Publication]:
-        """Получить все публикации автора с пагинацией"""
+        """Получить все публикации автора с пагинацией (включая abstract)"""
 
         all_publications = []
         offset = 0
-        fields = "title,authors,year,venue,citationCount,abstract,externalIds,url,openAccessPdf"
+
+        # Поля для публикаций автора (включая abstract)
+        fields = ",".join([
+            "title",
+            "authors",
+            "year",
+            "venue",
+            "citationCount",
+            "referenceCount",
+            "abstract",  # <-- ABSTRACT
+            "externalIds",
+            "url",
+            "openAccessPdf",
+            "isOpenAccess",
+            "s2FieldsOfStudy",
+            "publicationTypes"
+        ])
 
         while True:
             if progress_callback:
@@ -233,13 +310,11 @@ class SemanticScholarParser(BaseParser):
             for p in papers:
                 all_publications.append(self._parse_publication(p))
 
-            # Проверяем, есть ли ещё
             if len(papers) < self.BATCH_SIZE:
                 break
 
             offset += self.BATCH_SIZE
 
-            # Защита от бесконечного цикла
             if offset > 10000:
                 print("⚠️  Reached max offset limit")
                 break
@@ -253,7 +328,7 @@ class SemanticScholarParser(BaseParser):
         author_url: Optional[str] = None,
         progress_callback: Optional[ProgressCallback] = None
     ) -> AuthorProfile:
-        """Получить профиль автора"""
+        """Получить профиль автора (публикации включают abstract)"""
 
         # Определяем ID
         if not author_id and author_name:
@@ -263,7 +338,6 @@ class SemanticScholarParser(BaseParser):
             authors = await self.search_authors(author_name, limit=1)
             if authors:
                 author_id = authors[0].source_id
-                print(f"Found author ID: {author_id}")
 
         if not author_id:
             raise ValueError("author_id is required or author not found")
@@ -277,10 +351,10 @@ class SemanticScholarParser(BaseParser):
             {"fields": "name,affiliations,citationCount,hIndex,paperCount"}
         )
 
-        # Публикации с пагинацией
+        # Публикации с пагинацией (включая abstract)
         publications = await self._get_author_papers_paginated(author_id, progress_callback)
 
-        # Сортировка
+        # Сортировка по году (новые первыми)
         publications.sort(key=lambda x: x.year or 0, reverse=True)
 
         # Статистика по годам

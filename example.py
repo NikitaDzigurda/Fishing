@@ -1,98 +1,47 @@
 import asyncio
-
-# Абсолютные импорты из пакета academic_api
-from academic_api import (
-    ArxivParser,
-    GoogleScholarParser,
-    SemanticScholarParser,
-    ProxyType,
-    format_profile,
-    format_comparison,
-    export,
-    export_all
-)
-
-
-async def example_arxiv():
-    """Пример работы с arXiv"""
-    async with ArxivParser() as parser:
-        async def on_progress(status, count):
-            print(f"\r{status}", end="", flush=True)
-
-        profile = await parser.get_author_profile(
-            author_name="Yann LeCun",
-            progress_callback=on_progress
-        )
-        print()
-        print(format_profile(profile))
-
-        # Экспорт
-        export(profile, "output/lecun_arxiv.json")
-        export(profile, "output/lecun_arxiv.csv")
-        export(profile, "output/lecun_arxiv.bib")
-
-
-async def example_semantic_scholar():
-    """Пример работы с Semantic Scholar"""
-    async with SemanticScholarParser() as parser:
-        profile = await parser.get_author_profile(author_name="Geoffrey Hinton")
-        print(format_profile(profile))
-        export(profile, "output/hinton_s2.json")
-
-
-async def example_google_scholar():
-    """Пример работы с Google Scholar"""
-    async with GoogleScholarParser(proxy_type=ProxyType.FREE) as parser:
-        # Geoffrey Hinton's Google Scholar ID
-        profile = await parser.get_author_profile(
-            author_id="JicYPdAAAAAJ",
-            fill_publications=False  # Быстрый режим без деталей публикаций
-        )
-        print(format_profile(profile))
-
-
-async def example_search():
-    """Поиск авторов"""
-    async with SemanticScholarParser() as parser:
-        authors = await parser.search_authors("Yoshua Bengio", limit=5)
-
-        print("Найденные авторы:")
-        for a in authors:
-            print(f"  - {a.name} (ID: {a.source_id})")
-            print(f"    Citations: {a.metrics.citation_count}")
-
-
-async def example_multiple_sources():
-    """Сравнение данных из разных источников"""
-    profiles = []
-
-    # arXiv
-    async with ArxivParser() as parser:
-        profile = await parser.get_author_profile(author_name="Ilya Sutskever")
-        profiles.append(profile)
-        print(f"✓ arXiv: {len(profile.publications)} publications")
-
-    # Semantic Scholar
-    async with SemanticScholarParser() as parser:
-        profile = await parser.get_author_profile(author_name="Ilya Sutskever")
-        profiles.append(profile)
-        print(f"✓ Semantic Scholar: {len(profile.publications)} publications")
-
-    # Сравнение
-    print("\n" + format_comparison(profiles))
-
+import json
+from academic_api.main_parser import ParserConfig, parse_authors
 
 async def main():
-    """Запуск всех примеров"""
-    print("=" * 60)
-    print("ARXIV EXAMPLE")
-    print("=" * 60)
-    await example_arxiv()
+    authors = {
+        0: {
+            "id": 0,
+            "name": "Yann LeCun",
+            "scholar_id": "WLN3QrAAAAAJ",
+            "semantic_scholar_id": None,
+            "arxiv_name": "Yann LeCun"
+        },
+    }
 
-    print("\n" + "=" * 60)
-    print("SEMANTIC SCHOLAR EXAMPLE")
-    print("=" * 60)
-    await example_semantic_scholar()
+    config = ParserConfig(
+        use_arxiv=True,
+        use_semantic_scholar=True,
+        scopus_api_key='d2f9ab7360044da43833b7669f9fd350',
+        use_scopus=False,
+        use_google_scholar=False
+    )
+
+    def show_progress(current, total, name, status):
+        print(f"[{current}/{total}] {name}: {status}")
+
+    results = await parse_authors(authors, config, show_progress)
+
+
+    for key, data in results.items():
+        print(f"\n{'=' * 60}")
+        print(f"Author: {data['input']['name']}")
+        print(f"Sources found: {data['combined']['sources_found']}")
+        print(f"Citations: {data['combined']['metrics']['citations']:,}")
+        print(f"h-index: {data['combined']['metrics']['h_index']}")
+        print(f"Publications: {data['combined']['metrics']['publication_count']}")
+
+        if data["errors"]:
+            print(f"Errors: {data['errors']}")
+
+    with open("parsed_authors.json", "w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
+
+    print(f"\n✓ Saved to parsed_authors.json")
 
 
 if __name__ == "__main__":
