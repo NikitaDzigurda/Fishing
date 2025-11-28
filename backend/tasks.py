@@ -4,7 +4,6 @@ from backend.celery_app import celery_app
 
 @celery_app.task(name="backend.tasks.add")
 def add(x, y):
-    # simple example task
     sleep(1)
     return x + y
 

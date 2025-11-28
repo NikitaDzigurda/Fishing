@@ -11,7 +11,8 @@ RUN apt-get update \
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . /app
+# copy project into /app/backend so the package name `backend` is available
+COPY . /app/backend
 
 EXPOSE 8000
 

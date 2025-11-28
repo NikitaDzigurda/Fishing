@@ -1,0 +1,54 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: authorityprompt
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  api:
+      build: ./backend
+      working_dir: /app/backend
+      command: sh -c "until alembic upgrade head; do echo 'alembic upgrade failed, retrying in 2s'; sleep 2; done && uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
+      environment:
+        DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/authorityprompt
+        REDIS_URL: redis://redis:6379/0
+        HOST: 0.0.0.0
+        PORT: 8000
+        PYTHONPATH: /app
+      volumes:
+        - ./backend:/app/backend:rw
+      ports:
+        - "8000:8000"
+      depends_on:
+        - db
+        - redis
+
+  celery:
+    build: ./backend
+    working_dir: /app/backend
+    command: sh -c "until alembic upgrade head; do echo 'alembic upgrade failed, retrying in 2s'; sleep 2; done && celery -A backend.celery_app.celery_app worker --loglevel=info"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/authorityprompt
+      REDIS_URL: redis://redis:6379/0
+      PYTHONPATH: /app
+    volumes:
+      - ./backend:/app/backend:rw
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  pgdata:

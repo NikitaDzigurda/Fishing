@@ -15,7 +15,6 @@ class Settings(BaseSettings):
 
     ALLOWED_ORIGINS: list[str] = ["*"]
 
-    # Redis used by Celery
     REDIS_URL: str = "redis://redis:6379/0"
 
     class Config:
