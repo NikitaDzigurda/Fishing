@@ -338,7 +338,7 @@ function renderProfile(container, username, isEditable) {
 function renderCreateRequest(container) {
     container.innerHTML = `
         <div class="tech-card max-w-2xl mx-auto p-8 rounded-xl">
-            <h2 class="text-2xl orbitron-font mb-6 text-center">INITIALIZE TEAM REQUEST</h2>
+            <h2 class="text-2xl orbitron-font mb-6 text-center">INITIgiEAM REQUEST</h2>
             <div class="space-y-4">
                 <div>
                     <label class="block text-xs text-slate-400 mb-1">PROJECT TITLE</label>
