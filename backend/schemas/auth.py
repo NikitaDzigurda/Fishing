@@ -6,7 +6,7 @@ from uuid import UUID
 
 
 class UserCreate(BaseModel):
-	email: EmailStr
+	email: str
 	password: str
 	role: Optional[str] = "observer"
 
