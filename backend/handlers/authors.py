@@ -28,6 +28,24 @@ async def read_my_profile(
         )
     return ProfileRead.model_validate(profile)
 
+
+# 👇 ПЕРЕМЕСТИЛИ ЭТОТ БЛОК ВВЕРХ (ДО /{id})
+@router.get("/search")
+async def search_profiles(
+    q: str = Query(..., min_length=1, description="Search by name, university, major, or bio"),
+    limit: int = 20,
+    offset: int = 0,
+    service: SearchService = Depends(get_search_service)
+):
+    """
+    Search strictly within User Profiles.
+    """
+    # Обрати внимание: возвращаемое значение должно соответствовать схеме,
+    # если ты хочешь валидацию ответа, добавь response_model=List[ProfileRead] в декоратор
+    return await service.search_profiles(query=q, limit=limit, offset=offset)
+
+
+# 👇 ТЕПЕРЬ /{id} СТОИТ НИЖЕ /search
 @router.get("/{id}", response_model=ProfileRead)
 async def read_profile_by_id(id: int, db: AsyncSession = Depends(get_db)):
     profile = await get_profile_by_user_id(db, id)
@@ -37,6 +55,7 @@ async def read_profile_by_id(id: int, db: AsyncSession = Depends(get_db)):
             detail="Profile not found. Create one first."
         )
     return ProfileRead.model_validate(profile)
+
 
 @router.post("/me", response_model=ProfileRead, status_code=status.HTTP_201_CREATED)
 async def create_my_profile(
@@ -65,7 +84,6 @@ async def update_my_profile(
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db)
 ):
-    # create_or_update_profile тоже примет новые поля через **kwargs
     profile = await create_or_update_profile(
         db,
         user_id=current_user.id,
@@ -90,8 +108,6 @@ async def patch_my_profile(
     update_data = payload.model_dump(exclude_unset=True)
 
     for field, value in update_data.items():
-        # Здесь мы динамически обновляем атрибуты модели.
-        # Так как поля есть в модели SQLAlchemy, setattr сработает корректно.
         if hasattr(profile, field):
             setattr(profile, field, value)
 
@@ -100,15 +116,3 @@ async def patch_my_profile(
     await db.refresh(profile)
 
     return ProfileRead.model_validate(profile)
-
-@router.get("/search")
-async def search_profiles(
-    q: str = Query(..., min_length=1, description="Search by name, university, major, or bio"),
-    limit: int = 20,
-    offset: int = 0,
-    service: SearchService = Depends(get_search_service)
-):
-    """
-    Search strictly within User Profiles.
-    """
-    return await service.search_profiles(query=q, limit=limit, offset=offset)
