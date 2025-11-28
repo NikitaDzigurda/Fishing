@@ -1,6 +1,7 @@
 .idea/
 poetry.lock
 .venv/
+venv
 .env
 __pycache__/*
 database/__pycache__/*
