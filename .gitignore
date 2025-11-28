@@ -1,0 +1,14 @@
+.idea/
+poetry.lock
+.venv/
+.env
+__pycache__/*
+database/__pycache__/*
+model/__pycache__/*
+repository/__pycache__/_*
+schema/__pycache__/*
+handlers/__pycache__/*
+backend/__pycache__/*
+repository/__pycache__/*
+user-uploads/
+temp/
