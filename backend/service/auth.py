@@ -6,7 +6,6 @@ from jose import jwt, JWTError
 
 from backend.settings import settings
 
-# use Argon2 for password hashing: modern, secure, and avoids bcrypt 72-byte limit
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 
 
@@ -28,7 +27,6 @@ def create_access_token(subject: str, expires_delta: Optional[timedelta] = None)
 
 
 def create_refresh_token(subject: str, expires_delta: Optional[timedelta] = None) -> str:
-    # default refresh token lifetime: 7 days
     if expires_delta is None:
         expires_delta = timedelta(days=getattr(settings, "REFRESH_TOKEN_EXPIRE_DAYS", 7))
     expire = datetime.utcnow() + expires_delta

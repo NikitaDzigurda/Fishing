@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from backend.settings import settings
 from backend.celery_app import celery_app
 from backend.handlers.auth import router as auth_router
+from backend.handlers.authors import router as profile_router
 
 
 app = FastAPI(title="Academic Profile Backend", version="0.1.0")
@@ -18,29 +19,9 @@ app.add_middleware(
 )
 
 
-class TestResponse(BaseModel):
-	msg: str
-	env: str | None = None
 
-
-@app.get("/api/v1/health", response_model=TestResponse)
-async def healthcheck():
-	return TestResponse(msg="ok", env="development" if settings.DEBUG else "production")
-
-
-@app.get("/api/v1/test", response_model=TestResponse)
-async def test():
-	return TestResponse(msg="Hello from Academic Profile Backend!", env=settings.HOST)
-
-
-@app.post("/api/v1/task")
-def trigger_task():
-	res = celery_app.send_task("backend.tasks.add", args=(2, 3))
-	return {"task_id": res.id}
-
-
-# include auth routes
 app.include_router(auth_router)
+app.include_router(profile_router)
 
 
 if __name__ == "__main__":
