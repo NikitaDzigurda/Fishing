@@ -20,10 +20,6 @@ async def read_my_profile(
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db)
 ):
-    """
-    Получить профиль текущего пользователя.
-    Требует: Authorization: Bearer <access_token>
-    """
     profile = await get_profile_by_user_id(db, current_user.id)
     if not profile:
         raise HTTPException(
@@ -48,10 +44,6 @@ async def create_my_profile(
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db)
 ):
-    """
-    Создать профиль текущего пользователя.
-    Требует: Authorization: Bearer <access_token>
-    """
     existing = await get_profile_by_user_id(db, current_user.id)
     if existing:
         raise HTTPException(
@@ -62,11 +54,7 @@ async def create_my_profile(
     profile = await create_profile(
         db,
         user_id=current_user.id,
-        first_name=payload.first_name,
-        last_name=payload.last_name,
-        bio=payload.bio,
-        major=payload.major,
-        university=payload.university
+        **payload.model_dump()
     )
     return ProfileRead.model_validate(profile)
 
@@ -77,18 +65,11 @@ async def update_my_profile(
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db)
 ):
-    """
-    Обновить профиль текущего пользователя (создаст если не существует).
-    Требует: Authorization: Bearer <access_token>
-    """
+    # create_or_update_profile тоже примет новые поля через **kwargs
     profile = await create_or_update_profile(
         db,
         user_id=current_user.id,
-        first_name=payload.first_name,
-        last_name=payload.last_name,
-        bio=payload.bio,
-        major=payload.major,
-        university=payload.university
+        **payload.model_dump()
     )
     return ProfileRead.model_validate(profile)
 
@@ -99,7 +80,6 @@ async def patch_my_profile(
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db)
 ):
-
     profile = await get_profile_by_user_id(db, current_user.id)
     if not profile:
         raise HTTPException(
@@ -110,7 +90,10 @@ async def patch_my_profile(
     update_data = payload.model_dump(exclude_unset=True)
 
     for field, value in update_data.items():
-        setattr(profile, field, value)
+        # Здесь мы динамически обновляем атрибуты модели.
+        # Так как поля есть в модели SQLAlchemy, setattr сработает корректно.
+        if hasattr(profile, field):
+            setattr(profile, field, value)
 
     db.add(profile)
     await db.commit()
