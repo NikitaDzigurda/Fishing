@@ -27,9 +27,10 @@ class RecSys:
         self.coauthors_map = {}
         for user_id, user_info in self.authors_data.items():
             combined = user_info.get('combined', {})
-            # Преобразуем user_id в тот же тип, что в ключах (обычно str в JSON или int)
-            coauthors = combined.get('authors', [])
-            self.coauthors_map[user_id] = coauthors
+            for pubilcation in combined['publications']:
+                # Преобразуем user_id в тот же тип, что в ключах (обычно str в JSON или int)
+                coauthors = pubilcation.get('authors', [])
+                self.coauthors_map[user_id] = list(set(self.coauthors_map.get(user_id, [])+coauthors))
 
     def _init_second_degree_coauthors(self):
         self.second_degree_map = {}
