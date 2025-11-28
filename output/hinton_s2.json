@@ -1,0 +1,161 @@
+{
+  "name": "Geoffrey E. Hinton",
+  "source": "semantic_scholar",
+  "source_id": "2264335208",
+  "orcid": null,
+  "external_ids": {},
+  "aliases": [],
+  "affiliation": null,
+  "affiliations_history": [],
+  "email_domain": null,
+  "homepage": null,
+  "interests": [],
+  "fields_of_study": [],
+  "metrics": {
+    "citation_count": 580,
+    "citation_count_recent": 0,
+    "h_index": 2,
+    "h_index_recent": 0,
+    "i10_index": 0,
+    "i10_index_recent": 0,
+    "publication_count": 3,
+    "avg_citations_per_paper": 0.0
+  },
+  "citations_per_year": {},
+  "publications_per_year": {
+    "2025": 1,
+    "2010": 1,
+    "1989": 1
+  },
+  "publications": [
+    {
+      "title": "Nobel Lecture: Boltzmann machines",
+      "authors": [
+        {
+          "name": "Geoffrey E. Hinton",
+          "author_id": "2264335208",
+          "orcid": null,
+          "affiliation": null,
+          "email": null,
+          "source": "semantic_scholar"
+        }
+      ],
+      "year": 2025,
+      "date": null,
+      "source": "semantic_scholar",
+      "source_id": "faa3474ec99ba63fcb39f1a69d8f08e49d33ee01",
+      "external_ids": {
+        "doi": "10.1103/revmodphys.97.030502",
+        "semantic_scholar_id": "faa3474ec99ba63fcb39f1a69d8f08e49d33ee01"
+      },
+      "abstract": null,
+      "keywords": [],
+      "venue": "Reviews of Modern Physics",
+      "venue_type": null,
+      "publisher": null,
+      "volume": null,
+      "issue": null,
+      "pages": null,
+      "categories": [],
+      "primary_category": null,
+      "fields_of_study": [],
+      "citation_count": 2,
+      "reference_count": 0,
+      "influential_citation_count": 0,
+      "url": "https://www.semanticscholar.org/paper/faa3474ec99ba63fcb39f1a69d8f08e49d33ee01",
+      "pdf_url": "",
+      "source_url": null,
+      "language": null,
+      "license": null,
+      "is_open_access": false
+    },
+    {
+      "title": "Boltzmann Machines",
+      "authors": [
+        {
+          "name": "Geoffrey E. Hinton",
+          "author_id": "2264335208",
+          "orcid": null,
+          "affiliation": null,
+          "email": null,
+          "source": "semantic_scholar"
+        }
+      ],
+      "year": 2010,
+      "date": null,
+      "source": "semantic_scholar",
+      "source_id": "8736bd7dcc6d53b89bc0589b0474685e894b2e25",
+      "external_ids": {
+        "doi": "10.1007/978-0-387-30164-8_83",
+        "semantic_scholar_id": "8736bd7dcc6d53b89bc0589b0474685e894b2e25"
+      },
+      "abstract": null,
+      "keywords": [],
+      "venue": "Encyclopedia of Machine Learning",
+      "venue_type": null,
+      "publisher": null,
+      "volume": null,
+      "issue": null,
+      "pages": null,
+      "categories": [],
+      "primary_category": null,
+      "fields_of_study": [],
+      "citation_count": 0,
+      "reference_count": 0,
+      "influential_citation_count": 0,
+      "url": "https://www.semanticscholar.org/paper/8736bd7dcc6d53b89bc0589b0474685e894b2e25",
+      "pdf_url": "",
+      "source_url": null,
+      "language": null,
+      "license": null,
+      "is_open_access": false
+    },
+    {
+      "title": "Learning distributed representations of concepts.",
+      "authors": [
+        {
+          "name": "Geoffrey E. Hinton",
+          "author_id": "2264335208",
+          "orcid": null,
+          "affiliation": null,
+          "email": null,
+          "source": "semantic_scholar"
+        }
+      ],
+      "year": 1989,
+      "date": null,
+      "source": "semantic_scholar",
+      "source_id": "4ade4934db522fe6d634ff6f48887da46eedb4d1",
+      "external_ids": {
+        "semantic_scholar_id": "4ade4934db522fe6d634ff6f48887da46eedb4d1"
+      },
+      "abstract": null,
+      "keywords": [],
+      "venue": "",
+      "venue_type": null,
+      "publisher": null,
+      "volume": null,
+      "issue": null,
+      "pages": null,
+      "categories": [],
+      "primary_category": null,
+      "fields_of_study": [],
+      "citation_count": 579,
+      "reference_count": 0,
+      "influential_citation_count": 0,
+      "url": "https://www.semanticscholar.org/paper/4ade4934db522fe6d634ff6f48887da46eedb4d1",
+      "pdf_url": "",
+      "source_url": null,
+      "language": null,
+      "license": null,
+      "is_open_access": false
+    }
+  ],
+  "coauthors": [],
+  "first_publication_year": 1989,
+  "last_publication_year": 2025,
+  "url": "https://www.semanticscholar.org/author/2264335208",
+  "photo_url": null,
+  "fetched_at": "2025-11-28T13:46:43.505475",
+  "years_active": 36
+}
