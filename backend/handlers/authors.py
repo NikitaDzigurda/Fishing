@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
-from backend.dependencies import get_current_user
+from backend.dependencies import get_current_user, get_search_service
 from backend.crud.authors_profile import (
     get_profile_by_user_id,
     create_or_update_profile,
@@ -10,6 +10,7 @@ from backend.crud.authors_profile import (
 )
 from backend.schemas.profile import ProfileCreate, ProfileUpdate, ProfileRead
 from backend.models import User
+from backend.service.search import SearchService
 
 router = APIRouter(prefix="/api/v1/profile", tags=["profile"])
 
@@ -107,3 +108,15 @@ async def patch_my_profile(
     await db.refresh(profile)
 
     return ProfileRead.model_validate(profile)
+
+@router.get("/search")
+async def search_profiles(
+    q: str = Query(..., min_length=1, description="Search by name, university, major, or bio"),
+    limit: int = 20,
+    offset: int = 0,
+    service: SearchService = Depends(get_search_service)
+):
+    """
+    Search strictly within User Profiles.
+    """
+    return await service.search_profiles(query=q, limit=limit, offset=offset)

@@ -8,6 +8,7 @@ from backend.service.auth import decode_token
 from backend.crud.users import get_user_by_id
 from backend.service.importing import ImportService
 from backend.models import User
+from backend.service.search import SearchService
 
 
 security = HTTPBearer(auto_error=False)
@@ -114,3 +115,6 @@ def require_role(allowed_roles: list[str]):
 
 def get_import_service(db: AsyncSession = Depends(get_db)) -> ImportService:
     return ImportService(db)
+
+def get_search_service(db: AsyncSession = Depends(get_db)) -> SearchService:
+    return SearchService(db)
