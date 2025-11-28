@@ -8,7 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy import select
 
-from backend.models import User, UserProfile
+# Ensure this import points to your actual models file location
+from backend.models import User, UserProfile 
 
 class ImportService:
     """
@@ -16,16 +17,19 @@ class ImportService:
     """
 
     # Maps CSV headers to DB columns
-    # Split into two sets: User fields and Profile fields
+    # Keys = Normalized CSV Headers (lowercase, spaces replaced by underscores)
+    # Values = Exact Database Column Names
+    
     USER_MAPPING = {
         "email": "email",
-        "login": "email",  # mapping 'login' to 'email' field
+        "login": "email",
         "username": "email",
         "password": "password",
         "pass": "password"
     }
 
     PROFILE_MAPPING = {
+        # --- Basic Info ---
         "first_name": "first_name",
         "firstname": "first_name",
         "last_name": "last_name",
@@ -34,7 +38,45 @@ class ImportService:
         "major": "major",
         "department": "major",
         "university": "university",
-        "affiliation": "university"
+        "affiliation": "university",
+
+        # --- Scientific IDs ---
+        "google_scholar_id": "google_scholar_id",
+        "google_scholar": "google_scholar_id",
+        "gs_id": "google_scholar_id",
+        
+        "scopus_id": "scopus_id",
+        "scopus": "scopus_id",
+        
+        "orcid": "orcid",
+        "orcid_id": "orcid",
+        
+        "arxiv_name": "arxiv_name",
+        "arxiv": "arxiv_name",
+        
+        "semantic_scholar_id": "semantic_scholar_id",
+        "semantic_scholar": "semantic_scholar_id",
+
+        # --- Metrics ---
+        # Note: Ensure CSV contains clean numbers for these.
+        "citations_total": "citations_total",
+        "citations": "citations_total",
+        "total_citations": "citations_total",
+        
+        "citations_recent": "citations_recent",
+        "recent_citations": "citations_recent",
+        
+        "h_index": "h_index",
+        "hindex": "h_index",
+        "h-index": "h_index", # Normalized CSV might still have hyphens
+        
+        "i10_index": "i10_index",
+        "i10": "i10_index",
+        "i10-index": "i10_index",
+        
+        "publication_count": "publication_count",
+        "publications": "publication_count",
+        "paper_count": "publication_count"
     }
 
     def __init__(self, db: AsyncSession):
@@ -70,11 +112,11 @@ class ImportService:
         if df.empty:
             raise HTTPException(status_code=400, detail="File is empty.")
 
-        # Normalize Headers
+        # Normalize Headers: lowercase, strip spaces, replace space with underscore
+        # Note: This does NOT replace hyphens, so 'h-index' stays 'h-index'
         df.columns = [c.strip().lower().replace(' ', '_') for c in df.columns]
 
         # Check required columns for User creation
-        # We need at least an email/login column
         has_email = any(col in df.columns for col in ["email", "login", "username"])
         if not has_email:
             raise HTTPException(status_code=400, detail="File must contain 'email' or 'login' column.")
@@ -85,51 +127,45 @@ class ImportService:
         """
         Ensures all users in DF exist in DB. Returns a dict {email: user_id}.
         """
-        # 1. Standardize the 'email' column in the DataFrame
-        # Find which column corresponds to email based on mapping
+        # Identify email/password columns based on mapping
         email_col = next((c for c in df.columns if c in self.USER_MAPPING and self.USER_MAPPING[c] == 'email'), None)
         password_col = next((c for c in df.columns if c in self.USER_MAPPING and self.USER_MAPPING[c] == 'password'), None)
 
         if not email_col:
             raise HTTPException(status_code=400, detail="Could not identify email column.")
         
-        # Extract unique emails from file
+        # Extract unique emails
         input_emails = df[email_col].dropna().unique().tolist()
 
-        # 2. Find existing users in DB
+        # Find existing users
         result = await self.db.execute(select(User.email, User.id).where(User.email.in_(input_emails)))
-        existing_users = result.all() # list of (email, id) tuples
+        existing_users = result.all()
         email_to_id = {u.email: u.id for u in existing_users}
 
-        # 3. Filter for NEW users
+        # Filter for NEW users
         new_users_df = df[~df[email_col].isin(email_to_id.keys())].copy()
-        
-        # Deduplicate by email (in case CSV has duplicates)
         new_users_df = new_users_df.drop_duplicates(subset=[email_col])
 
         if not new_users_df.empty:
             if not password_col:
                  raise HTTPException(status_code=400, detail="New users found, but no 'password' column provided.")
 
-            # Prepare records for insertion
             new_user_records = []
             for _, row in new_users_df.iterrows():
-                raw_pwd = str(row[password_col]) if pd.notna(row[password_col]) else "default123" # Fallback or error
+                raw_pwd = str(row[password_col]) if pd.notna(row[password_col]) else "default123"
                 
                 new_user_records.append({
                     "email": row[email_col],
                     "hashed_password": get_password_hash(raw_pwd),
-                    "role": "observer", # default
+                    "role": "observer",
                     "is_active": True
                 })
 
-            # Bulk Insert and Return IDs
-            # returning(User.id, User.email) allows us to get the generated IDs immediately
+            # Bulk Insert
             stmt = insert(User).values(new_user_records).returning(User.id, User.email)
             result = await self.db.execute(stmt)
             newly_created = result.all()
 
-            # Add new IDs to our map
             for row in newly_created:
                 email_to_id[row.email] = row.id
 
@@ -139,27 +175,25 @@ class ImportService:
         """
         Upserts UserProfile records using the user_ids mapped from emails.
         """
-        # Identify email column again
         email_col = next((c for c in df.columns if c in self.USER_MAPPING and self.USER_MAPPING[c] == 'email'), None)
         
-        # Prepare Profile Records
         profile_records = []
 
-        # Iterate through DF to build profile dicts
         for _, row in df.iterrows():
             email = row[email_col]
             user_id = email_to_id.get(email)
             
             if not user_id:
-                continue # Should not happen given logic above
+                continue
 
-            # Map CSV columns to Profile Model columns
             record = {"user_id": user_id}
             
+            # Map CSV columns to Profile Model columns
             for csv_col, db_col in self.PROFILE_MAPPING.items():
                 if csv_col in df.columns:
                     val = row[csv_col]
                     # Handle Pandas NaN -> None
+                    # For Integer fields (h_index, citations), ensure clean input in CSV
                     record[db_col] = val if pd.notna(val) else None
 
             profile_records.append(record)
@@ -170,7 +204,7 @@ class ImportService:
         try:
             stmt = insert(UserProfile).values(profile_records)
 
-            # Upsert Logic: Update profile fields if user_id exists
+            # Update all columns except primary keys on conflict
             update_dict = {
                 col.name: stmt.excluded[col.name]
                 for col in UserProfile.__table__.columns
@@ -178,7 +212,7 @@ class ImportService:
             }
 
             upsert_stmt = stmt.on_conflict_do_update(
-                index_elements=['user_id'], # Unique constraint on UserProfile
+                index_elements=['user_id'],
                 set_=update_dict
             )
 
