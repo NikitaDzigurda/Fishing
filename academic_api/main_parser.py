@@ -3,6 +3,7 @@
 """
 
 import asyncio
+import re
 from typing import Optional, Any
 from dataclasses import dataclass, asdict
 from datetime import datetime
@@ -36,26 +37,6 @@ async def parse_authors(
 ) -> dict[int, dict]:
     """
     Массовый парсинг авторов
-
-    Args:
-        authors_dict: Словарь авторов вида:
-            {
-                0: {
-                    "id": 0,
-                    "name": "Yann LeCun",
-                    "scholar_id": "WLN3QrAAAAAJ",
-                    "semantic_scholar_id": "1688681",
-                    "scopus_id": "7004584547",
-                    "arxiv_name": "Yann LeCun",
-                },
-                1: {...},
-                ...
-            }
-        config: Конфигурация парсеров
-        progress_callback: Функция обратного вызова (current, total, author_name, status)
-
-    Returns:
-        Словарь с полной информацией
     """
     config = config or ParserConfig()
     results = {}
@@ -211,7 +192,7 @@ def _profile_to_dict(profile: AuthorProfile) -> dict:
                 "title": p.title,
                 "year": p.year,
                 "citations": p.citation_count,
-                "abstract": p.abstract,  # <--- ДОБАВЬ ВОТ ЭТУ СТРОЧКУ
+                "abstract": p.abstract,
                 "venue": p.venue,
                 "doi": p.external_ids.doi,
                 "url": p.url,
@@ -229,8 +210,16 @@ def _profile_to_dict(profile: AuthorProfile) -> dict:
     }
 
 
+def _normalize_title(title: str) -> str:
+    """Нормализация названия для поиска дубликатов"""
+    if not title:
+        return ""
+    # Приводим к нижнему регистру и оставляем только буквы и цифры
+    return "".join(c.lower() for c in title if c.isalnum())
+
+
 def _combine_profiles(profiles: dict[str, AuthorProfile], input_data: dict) -> dict:
-    """Объединение данных из разных источников"""
+    """Объединение данных из разных источников, включая слияние публикаций"""
 
     combined = {
         "name": input_data.get("name"),
@@ -247,11 +236,16 @@ def _combine_profiles(profiles: dict[str, AuthorProfile], input_data: dict) -> d
         },
 
         "sources_found": list(profiles.keys()),
-        "total_publications_all_sources": 0
+        "total_publications_all_sources": 0,
+        "publications": []  # Сюда сложим уникальные
     }
 
+    # Приоритет для метаданных и метрик
+    # Google Scholar обычно имеет самые высокие цифры цитирования, но плохие метаданные
+    # Semantic Scholar / Scopus имеют хорошие метаданные
     priority = ["google_scholar", "scopus", "semantic_scholar", "arxiv"]
 
+    # === 1. Объединение метаданных ===
     for source in priority:
         if source in profiles:
             p = profiles[source]
@@ -267,6 +261,7 @@ def _combine_profiles(profiles: dict[str, AuthorProfile], input_data: dict) -> d
 
             combined["interests"] = list(set(combined["interests"] + p.interests))
 
+            # Берем максимальные метрики
             if p.metrics.citation_count > combined["metrics"]["citations"]:
                 combined["metrics"]["citations"] = p.metrics.citation_count
             if p.metrics.h_index > combined["metrics"]["h_index"]:
@@ -277,6 +272,103 @@ def _combine_profiles(profiles: dict[str, AuthorProfile], input_data: dict) -> d
                 combined["metrics"]["publication_count"] = p.metrics.publication_count
 
             combined["total_publications_all_sources"] += len(p.publications)
+
+    # === 2. Объединение публикаций (Дедупликация) ===
+    merged_publications = []
+
+    # Словари для быстрого поиска дублей
+    seen_dois = {}    # doi -> index in merged_publications
+    seen_titles = {}  # normalized_title -> index in merged_publications
+
+    # Проходим по источникам.
+    # Для метаданных статей лучше Scopus/Semantic Scholar, поэтому порядок такой:
+    merge_priority = ["scopus", "semantic_scholar", "google_scholar", "arxiv"]
+
+    for source in merge_priority:
+        if source not in profiles:
+            continue
+
+        profile = profiles[source]
+        for pub in profile.publications:
+            # Получаем ключи для матчинга
+            doi = pub.external_ids.doi
+            if doi:
+                doi = doi.lower().strip()
+
+            norm_title = _normalize_title(pub.title)
+            if not norm_title:
+                continue
+
+            # Проверяем, есть ли уже такая статья
+            match_index = -1
+
+            if doi and doi in seen_dois:
+                match_index = seen_dois[doi]
+            elif norm_title in seen_titles:
+                match_index = seen_titles[norm_title]
+
+            # Данные текущей статьи для сохранения
+            pub_dict = {
+                "title": pub.title,
+                "year": pub.year,
+                "citations": pub.citation_count,
+                "abstract": pub.abstract,
+                "venue": pub.venue,
+                "doi": pub.external_ids.doi,
+                "url": pub.url,
+                "authors": [a.name for a in pub.authors],
+                "sources": [source] # Отслеживаем, где нашли
+            }
+
+            if match_index > -1:
+                # === MERGE (Обновление существующей) ===
+                existing = merged_publications[match_index]
+
+                # Берем максимальное цитирование
+                existing["citations"] = max(existing["citations"], pub_dict["citations"])
+
+                # Если в текущей есть abstract, а в сохраненной нет - берем текущий
+                if not existing["abstract"] and pub_dict["abstract"]:
+                    existing["abstract"] = pub_dict["abstract"]
+
+                # Если в текущей есть DOI, а в сохраненной нет
+                if not existing["doi"] and pub_dict["doi"]:
+                    existing["doi"] = pub_dict["doi"]
+                    if pub_dict["doi"]:
+                        seen_dois[pub_dict["doi"].lower().strip()] = match_index
+
+                # Если в текущей есть URL, а в сохраненной нет
+                if not existing["url"] and pub_dict["url"]:
+                    existing["url"] = pub_dict["url"]
+
+                # Если в текущей есть venue, а в сохраненной нет
+                if not existing["venue"] and pub_dict["venue"]:
+                    existing["venue"] = pub_dict["venue"]
+
+                # Если название длиннее (вероятно полнее), берем его
+                if len(pub_dict["title"]) > len(existing["title"]):
+                     existing["title"] = pub_dict["title"]
+
+                if source not in existing["sources"]:
+                    existing["sources"].append(source)
+
+            else:
+                # === INSERT (Новая статья) ===
+                merged_publications.append(pub_dict)
+                new_index = len(merged_publications) - 1
+
+                seen_titles[norm_title] = new_index
+                if doi:
+                    seen_dois[doi] = new_index
+
+    # Сортируем итоговый список по цитированиям
+    merged_publications.sort(key=lambda x: -(x["citations"] or 0))
+
+    combined["publications"] = merged_publications
+
+    # Пересчитываем метрики на основе объединенных данных (опционально)
+    # Например, если мы доверяем сумме уникальных статей больше, чем цифре из профиля
+    # combined["metrics"]["publication_count"] = len(merged_publications)
 
     return combined
 
