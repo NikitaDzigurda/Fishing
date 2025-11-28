@@ -13,7 +13,7 @@ class UserCreate(BaseModel):
 
 class UserRead(BaseModel):
 	id: int
-	email: EmailStr
+	email: str
 	role: str
 	is_active: bool
 	model_config = {"from_attributes": True}
