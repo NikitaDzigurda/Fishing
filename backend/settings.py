@@ -9,9 +9,10 @@ class Settings(BaseSettings):
     PORT: int = 8000
     DEBUG: bool = True
 
-    SECRET_KEY: str = "your-secret-key-change-in-production"
+    SECRET_KEY: str = "329cd225b19f49a281b0fd4f046b084b5c80184dd71b98f66a88e8232e1be599"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     ALLOWED_ORIGINS: list[str] = ["*"]
 

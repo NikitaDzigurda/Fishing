@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 from backend.settings import settings
 from backend.celery_app import celery_app
+from backend.handlers.auth import router as auth_router
 
 
 app = FastAPI(title="Academic Profile Backend", version="0.1.0")
@@ -36,6 +37,10 @@ async def test():
 def trigger_task():
 	res = celery_app.send_task("backend.tasks.add", args=(2, 3))
 	return {"task_id": res.id}
+
+
+# include auth routes
+app.include_router(auth_router)
 
 
 if __name__ == "__main__":
