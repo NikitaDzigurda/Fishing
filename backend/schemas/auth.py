@@ -16,7 +16,6 @@ class UserRead(BaseModel):
 	email: EmailStr
 	role: str
 	is_active: bool
-	# Pydantic v2: use model_config to allow .from_orm / reading from ORM objects
 	model_config = {"from_attributes": True}
 
 
