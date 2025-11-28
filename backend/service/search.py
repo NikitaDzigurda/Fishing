@@ -24,7 +24,6 @@ class SearchService:
                     UserProfile.last_name.ilike(search_term),
                     UserProfile.university.ilike(search_term),
                     UserProfile.major.ilike(search_term),
-                    UserProfile.bio.ilike(search_term)
                 )
             )
 
