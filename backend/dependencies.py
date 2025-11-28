@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database import get_db
 from backend.service.auth import decode_token
 from backend.crud.users import get_user_by_id
+from backend.service.importing import ImportService
 from backend.models import User
 
 
@@ -110,3 +111,6 @@ def require_role(allowed_roles: list[str]):
         return current_user
 
     return role_checker
+
+def get_import_service(db: AsyncSession = Depends(get_db)) -> ImportService:
+    return ImportService(db)

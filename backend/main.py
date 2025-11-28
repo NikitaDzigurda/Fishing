@@ -6,6 +6,7 @@ from backend.settings import settings
 from backend.celery_app import celery_app
 from backend.handlers.auth import router as auth_router
 from backend.handlers.authors import router as profile_router
+from backend.handlers.admin import router as admin_router
 
 
 app = FastAPI(title="Academic Profile Backend", version="0.1.0")
@@ -22,6 +23,7 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(profile_router)
+app.include_router(admin_router)
 
 
 if __name__ == "__main__":
