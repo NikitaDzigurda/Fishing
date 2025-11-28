@@ -32,6 +32,15 @@ async def read_my_profile(
         )
     return ProfileRead.model_validate(profile)
 
+@router.get("/{id}", response_model=ProfileRead)
+async def read_profile_by_id(id: int, db: AsyncSession = Depends(get_db)):
+    profile = await get_profile_by_user_id(db, id)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profile not found. Create one first."
+        )
+    return ProfileRead.model_validate(profile)
 
 @router.post("/me", response_model=ProfileRead, status_code=status.HTTP_201_CREATED)
 async def create_my_profile(
