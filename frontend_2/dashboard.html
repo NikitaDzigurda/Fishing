@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Хакатон 2025</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="text-white relative min-h-screen flex flex-col">
+
+    <div id="tech-bg-container" class="tech-bg"><div class="tech-lines"></div></div>
+
+    <!-- NAVBAR / HEADER -->
+    <header class="w-full p-4 z-20 sticky top-0">
+        <div class="user-status-container max-w-7xl mx-auto rounded-xl p-3 flex justify-between items-center shadow-lg shadow-cyan-500/10">
+            
+            <!-- Левая часть: Статус пользователя -->
+            <div class="flex items-center gap-4 pl-2">
+                <div id="user-avatar" class="avatar-circle bg-slate-900">
+                    <i class="fa-solid fa-user text-xl"></i>
+                </div>
+                <div>
+                    <div id="user-role" class="text-[10px] tracking-widest font-bold uppercase">CHECKING AUTH...</div>
+                    <div id="user-name" class="text-lg font-bold orbitron-font leading-none">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Правая часть: Меню -->
+            <div class="flex items-center gap-4">
+                <span class="hidden md:inline text-slate-400 text-sm">HACKATHON_STATUS: <span class="text-green-400 animate-pulse">ACTIVE</span></span>
+                <button onclick="handleLogout()" class="border border-red-900/50 bg-red-950/30 hover:bg-red-900/50 text-red-400 hover:text-red-200 px-4 py-2 rounded-lg transition-all text-sm font-bold">
+                    <i class="fa-solid fa-power-off mr-2"></i> EXIT
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main class="flex-grow flex flex-col items-center justify-center p-4 relative z-10 text-center">
+        
+        <div class="tech-card p-10 rounded-2xl max-w-4xl w-full">
+            <h1 class="text-4xl md:text-6xl font-black mb-4 neon-text">WELCOME, SCIENTIST</h1>
+            <p class="text-xl text-cyan-200 font-light mb-8">Access granted to the mainframe. Prepare your projects.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+                <!-- Карточка 1 -->
+                <div class="border border-slate-600 bg-slate-900/40 p-6 rounded-xl hover:border-cyan-400 transition-colors cursor-pointer group">
+                    <i class="fa-solid fa-code text-4xl mb-4 text-slate-500 group-hover:text-cyan-400 transition-colors"></i>
+                    <h3 class="text-xl font-bold mb-2">TASKS</h3>
+                    <p class="text-sm text-slate-400">View current hackathon challenges.</p>
+                </div>
+                <!-- Карточка 2 -->
+                <div class="border border-slate-600 bg-slate-900/40 p-6 rounded-xl hover:border-cyan-400 transition-colors cursor-pointer group">
+                    <i class="fa-solid fa-users text-4xl mb-4 text-slate-500 group-hover:text-cyan-400 transition-colors"></i>
+                    <h3 class="text-xl font-bold mb-2">TEAM</h3>
+                    <p class="text-sm text-slate-400">Manage your squad members.</p>
+                </div>
+                <!-- Карточка 3 -->
+                <div class="border border-slate-600 bg-slate-900/40 p-6 rounded-xl hover:border-cyan-400 transition-colors cursor-pointer group">
+                    <i class="fa-solid fa-upload text-4xl mb-4 text-slate-500 group-hover:text-cyan-400 transition-colors"></i>
+                    <h3 class="text-xl font-bold mb-2">SUBMIT</h3>
+                    <p class="text-sm text-slate-400">Upload your solution.</p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script src="bg-effects.js"></script>
+    <script src="logic.js"></script>
+    <script>
+        // Инициализация при загрузке именно этой страницы
+        document.addEventListener('DOMContentLoaded', initDashboard);
+    </script>
+</body>
+</html>
