@@ -14,7 +14,7 @@ async def main():
     }
 
     config = ParserConfig(
-        use_arxiv=True,
+        use_arxiv=False,
         use_semantic_scholar=True,
         scopus_api_key='d2f9ab7360044da43833b7669f9fd350',
         use_scopus=False,
