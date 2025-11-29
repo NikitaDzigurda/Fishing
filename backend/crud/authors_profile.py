@@ -14,13 +14,12 @@ async def get_profile_by_user_id(db: AsyncSession, user_id: int) -> Optional[Use
 async def create_profile(
         db: AsyncSession,
         user_id: int,
-        # Основные поля
         first_name: Optional[str] = None,
         last_name: Optional[str] = None,
         bio: Optional[str] = None,
         major: Optional[str] = None,
         university: Optional[str] = None,
-        # Новые поля
+        contact_info: Optional[str] = None,
         google_scholar_id: Optional[str] = None,
         scopus_id: Optional[str] = None,
         orcid: Optional[str] = None,
@@ -34,6 +33,7 @@ async def create_profile(
         bio=bio,
         major=major,
         university=university,
+        contact_info=contact_info,
         google_scholar_id=google_scholar_id,
         scopus_id=scopus_id,
         orcid=orcid,
@@ -54,6 +54,7 @@ async def create_or_update_profile(
         bio: Optional[str] = None,
         major: Optional[str] = None,
         university: Optional[str] = None,
+        contact_info: Optional[str] = None,
         google_scholar_id: Optional[str] = None,
         scopus_id: Optional[str] = None,
         orcid: Optional[str] = None,
@@ -68,6 +69,7 @@ async def create_or_update_profile(
         if bio is not None: existing.bio = bio
         if major is not None: existing.major = major
         if university is not None: existing.university = university
+        if contact_info is not None: existing.contact_info = contact_info
 
         if google_scholar_id is not None: existing.google_scholar_id = google_scholar_id
         if scopus_id is not None: existing.scopus_id = scopus_id
@@ -80,8 +82,9 @@ async def create_or_update_profile(
         await db.refresh(existing)
         return existing
 
-    # Если профиля нет - создаем
     return await create_profile(
-        db, user_id, first_name, last_name, bio, major, university,
+        db, user_id,
+        first_name, last_name, bio, major, university,
+        contact_info,
         google_scholar_id, scopus_id, orcid, arxiv_name, semantic_scholar_id
     )

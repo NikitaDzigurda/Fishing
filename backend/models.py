@@ -32,6 +32,7 @@ class UserProfile(Base):
     bio = Column(Text, nullable=True)
     major = Column(String(200), nullable=True)
     university = Column(String(300), nullable=True)
+    contact_info = Column(String(300), nullable=True)
 
     google_scholar_id = Column(String(100), nullable=True)
     scopus_id = Column(String(100), nullable=True)

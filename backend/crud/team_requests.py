@@ -1,10 +1,11 @@
 # backend/crud/team_requests.py
 
 from typing import List, Optional
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, or_
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models import TeamRequest
+from backend.models import TeamRequest, User
 
 async def create_team_request(
     db: AsyncSession,
@@ -18,7 +19,7 @@ async def create_team_request(
         title=title,
         description=description,
         required_roles=required_roles,
-        recommended_user_ids=[] # При создании рекомендаций пока нет
+        recommended_user_ids=[]
     )
     db.add(request)
     await db.commit()
@@ -43,7 +44,6 @@ async def update_request_recommendations(
     request_id: int,
     user_ids: list[int]
 ) -> Optional[TeamRequest]:
-    """Функция для будущего ML алгоритма: записать топ-5 ID"""
     request = await get_request_by_id(db, request_id)
     if request:
         request.recommended_user_ids = user_ids
@@ -60,7 +60,6 @@ async def update_team_request(
     required_roles: Optional[list[str]] = None,
     is_active: Optional[bool] = None
 ) -> TeamRequest:
-    """Обновление полей заявки"""
     if title is not None:
         request.title = title
     if description is not None:
@@ -76,9 +75,36 @@ async def update_team_request(
     return request
 
 async def soft_delete_team_request(db: AsyncSession, request: TeamRequest) -> TeamRequest:
-    """Мягкое удаление (деактивация)"""
     request.is_active = False
     db.add(request)
     await db.commit()
     await db.refresh(request)
     return request
+
+
+async def get_all_active_requests(
+        db: AsyncSession,
+        skip: int = 0,
+        limit: int = 20,
+        search_query: Optional[str] = None
+) -> List[TeamRequest]:
+    """Получить все активные заявки с подгрузкой авторов"""
+    query = (
+        select(TeamRequest)
+        .options(selectinload(TeamRequest.author).selectinload(User.profile))
+        .where(TeamRequest.is_active == True)
+    )
+
+    if search_query:
+        search = f"%{search_query}%"
+        query = query.where(
+            or_(
+                TeamRequest.title.ilike(search),
+                TeamRequest.description.ilike(search)
+            )
+        )
+
+    query = query.order_by(desc(TeamRequest.created_at)).offset(skip).limit(limit)
+
+    result = await db.execute(query)
+    return result.scalars().all()
