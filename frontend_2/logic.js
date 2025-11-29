@@ -25,7 +25,7 @@ const deleteCookie = (name) => {
     document.cookie = name + '=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
 };
 
-// Показать ошибку
+// Показать ошибку (для подсветки инпутов)
 const showError = (inputElement) => {
     const parent = inputElement.parentElement;
     parent.classList.add('input-error');
@@ -35,12 +35,13 @@ const showError = (inputElement) => {
 };
 
 // Состояние кнопки
-const setButtonLoading = (btn, isLoading, originalText = '') => {
+const setButtonLoading = (btn, isLoading, originalText = 'SUBMIT') => { // Установил 'SUBMIT' как текст по умолчанию
     const span = btn.querySelector('span');
     if (isLoading) {
         btn.disabled = true;
         btn.dataset.originalText = span.innerText;
-        span.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> PROCESSING...';
+        // Сообщение о загрузке
+        span.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> **PROCESSING...**';
     } else {
         btn.disabled = false;
         span.innerText = btn.dataset.originalText || originalText;
@@ -65,7 +66,28 @@ const saveSession = (type, email, tokens = null) => {
 
 // --- ОСНОВНЫЕ ФУНКЦИИ ---
 
-// 1. ПРОВЕРКА СООБЩЕНИЙ НА СТРАНИЦЕ ВХОДА (НОВАЯ ФУНКЦИЯ)
+// 1. Показать системное сообщение об ошибке (красное)
+const showRegistrationError = (message) => {
+    const msgBox = document.getElementById('error-message-reg');
+    const msgText = document.getElementById('error-text-reg');
+
+    if (msgBox && msgText) {
+        msgText.innerText = message;
+        
+        // Показываем сообщение и применяем стили
+        msgBox.classList.remove('hidden');
+        msgBox.classList.add('flex'); // Для Flexbox верстки
+
+        // Автоматически скрыть через 5 секунд
+        setTimeout(() => {
+            msgBox.classList.remove('flex');
+            msgBox.classList.add('hidden');
+        }, 5000); 
+    }
+};
+
+
+// 2. ПРОВЕРКА СООБЩЕНИЙ НА СТРАНИЦЕ ВХОДА
 function initLogin() {
     // Проверяем параметры URL (например, login.html?status=registered)
     const params = new URLSearchParams(window.location.search);
@@ -73,12 +95,17 @@ function initLogin() {
     if (params.get('status') === 'registered') {
         const msgBox = document.getElementById('success-message');
         if (msgBox) {
+            // Сообщение об успешной регистрации
+            const defaultMessage = "Registration successful! Please log in with your new credentials.";
+            msgBox.querySelector('span').innerText = defaultMessage; 
+            
             msgBox.classList.remove('hidden'); // Показываем сообщение
             msgBox.classList.add('flex'); // Для Flexbox верстки
         }
     }
 }
 
+// 3. АВТОРИЗАЦИЯ
 async function handleLogin() {
     const loginInput = document.getElementById('login-input'); // Email
     const passInput = document.getElementById('pass-input');
@@ -110,7 +137,7 @@ async function handleLogin() {
             const errorData = await response.json().catch(() => ({}));
             const msg = errorData.detail
                 ? (Array.isArray(errorData.detail) ? errorData.detail[0].msg : errorData.detail)
-                : 'Ошибка входа.';
+                : 'Login failed.'; // Английское сообщение по умолчанию
             throw new Error(msg);
         }
 
@@ -126,11 +153,8 @@ async function handleLogin() {
         setButtonLoading(btn, false);
     }
 }
-// ... (Остальной код: delay, showError, setButtonLoading, initLogin и т.д.) ...
 
-// Конфигурация API
-
-// 3. РЕГИСТРАЦИЯ (С ЗАПРОСОМ К API)
+// 4. РЕГИСТРАЦИЯ
 async function handleRegister() {
     const loginInput = document.getElementById('reg-login');
     const passInput = document.getElementById('reg-pass');
@@ -153,8 +177,6 @@ async function handleRegister() {
         };
 
         // 3. Отправляем запрос
-        // ВАЖНО: В вашем OpenAPI нет '/register'. Я добавил его как пример.
-        // Если вы хотите использовать '/task', замените URL ниже.
         const response = await fetch(`${API_BASE_URL}/auth/register`, {
             method: 'POST',
             headers: {
@@ -164,48 +186,63 @@ async function handleRegister() {
             body: JSON.stringify(payload)
         });
 
-        console.log("repsonse");
+        console.log("repsonse", response);
 
-        console.log(response);
-
-        // 4. Обработка ошибок HTTP (например, 400 Bad Request, 409 Conflict)
-        if (response.status !== 200) {
+        // 4. Обработка ошибок HTTP (все статусы вне 200-299)
+        if (!response.ok) { 
             // Пытаемся получить текст ошибки от сервера
             const errorData = await response.json().catch(() => ({}));
-            const errorMessage = errorData.detail || errorData.message || 'Ошибка регистрации';
+            let errorMessage = errorData.detail 
+                ? (Array.isArray(errorData.detail) ? errorData.detail[0].msg : errorData.detail)
+                : 'An unknown registration error occurred.'; // Английское сообщение по умолчанию
 
-            throw new Error(errorMessage);
+            if (response.status === 400) {
+                // Если API возвращает 'user already exists' или похожий текст:
+                if (errorMessage.toLowerCase().includes('user already exists') || errorMessage.toLowerCase().includes('already registered')) {
+                     errorMessage = 'This user is already registered in the database.'; // Английское сообщение
+                }
+                
+                // Выводим красное сообщение и останавливаем выполнение
+                showRegistrationError(errorMessage);
+                setButtonLoading(btn, false, 'REGISTER'); // Сброс кнопки загрузки. Используем оригинальный текст кнопки 'REGISTER'
+                return; 
+            }
+            
+            // Для других кодов ошибок (401, 500, 409 и т.д.)
+            showRegistrationError(`Error (${response.status}): ${errorMessage}`);
+            
+            // Выбрасываем ошибку для обработки в блоке catch
+            throw new Error(`API Error: ${errorMessage}`);
         }
 
         // 5. Успешная регистрация
-        // Опционально: получаем ответ, если сервер возвращает ID пользователя
-        // const data = await response.json(); 
-
-        // Перенаправляем на логин с сообщением об успехе
         window.location.href = 'login.html?status=registered';
 
     } catch (error) {
         console.error('Registration failed:', error);
-
-        // Показываем ошибку пользователю (можно сделать красивее, пока alert)
-        alert(`Не удалось зарегистрироваться: ${error.message}`);
-
-        // Сбрасываем кнопку, чтобы можно было попробовать снова
-        setButtonLoading(btn, false);
+        
+        // Сбрасываем кнопку, если ошибка не была обработана выше
+        setButtonLoading(btn, false, 'REGISTER');
     }
 }
 
 
-// 4. ГОСТЕВОЙ РЕЖИМ
+// 5. ГОСТЕВОЙ РЕЖИМ
 async function handleGuest() {
     const btn = document.getElementById('btn-guest');
-    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
+    // Обновляем текст кнопки
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>'; 
     await delay(800);
+    
     saveSession('guest', 'Guest User');
     window.location.href = 'dashboard.html';
+    
+    // В теории эта часть не нужна, так как идет редирект, но для чистоты
+    btn.innerHTML = originalText;
 }
 
-// 5. ДАШБОРД
+// 6. ДАШБОРД
 function initDashboard() {
     const userType = localStorage.getItem('userType');
     const username = localStorage.getItem('username');
@@ -225,17 +262,17 @@ function initDashboard() {
     if (userType === 'user') {
         avatarEl.classList.add('avatar-user');
         iconEl.classList.add('fa-user-astronaut');
-        roleEl.innerText = 'AUTHORIZED PARTICIPANT';
+        roleEl.innerText = 'AUTHORIZED PARTICIPANT'; // Английский текст
         roleEl.classList.add('text-cyan-400');
     } else {
         avatarEl.classList.add('avatar-guest');
         iconEl.classList.add('fa-user-secret');
-        roleEl.innerText = 'GUEST ACCESS';
+        roleEl.innerText = 'GUEST ACCESS'; // Английский текст
         roleEl.classList.add('text-slate-400');
     }
 }
 
-// 6. ВЫХОД
+// 7. ВЫХОД
 function handleLogout() {
     localStorage.clear();
     window.location.href = 'login.html';
