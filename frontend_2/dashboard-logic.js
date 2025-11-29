@@ -17,11 +17,17 @@ const getCookie = (name) => {
 const apiCall = async (endpoint, options = {}) => {
     const token = getCookie('access_token');
     
+    // Default headers
     const headers = {
-        'Content-Type': 'application/json',
         'Accept': 'application/json',
         ...options.headers
     };
+
+    // IMPORTANT: Only set JSON content type if body is NOT FormData.
+    // When sending FormData (files), the browser must set Content-Type automatically.
+    if (options.body && !(options.body instanceof FormData)) {
+        headers['Content-Type'] = 'application/json';
+    }
 
     if (token) {
         headers['Authorization'] = `Bearer ${token}`;
@@ -34,21 +40,23 @@ const apiCall = async (endpoint, options = {}) => {
         });
 
         if (response.status === 401) {
-            // Token expired or invalid
             window.location.href = 'login.html';
             return null;
         }
 
         if (!response.ok) {
             const err = await response.json().catch(() => ({}));
+            // Handle Validation Errors (422) specifically
+            if (err.detail && Array.isArray(err.detail)) {
+                throw new Error(err.detail.map(e => e.msg).join(', '));
+            }
             throw new Error(err.detail || 'API Request Failed');
         }
 
         return await response.json();
     } catch (error) {
         console.error('API Error:', error);
-        alert(error.message);
-        return null;
+        throw error; // Re-throw so the caller can handle UI updates
     }
 };
 
@@ -227,18 +235,169 @@ function renderAdminDashboard(container) {
     `;
 }
 
-// 2. CSV UPLOAD (Mocked)
+// 2. CSV/EXCEL UPLOAD (Admin - REAL API)
 function renderUpload(container) {
     container.innerHTML = `
-        <div class="tech-card max-w-2xl mx-auto p-10 rounded-xl text-center">
-            <h2 class="text-3xl font-bold mb-6">UPLOAD USER DATABASE</h2>
-            <div class="border-2 border-dashed border-slate-600 hover:border-cyan-400 rounded-xl p-10 transition-colors cursor-pointer bg-slate-900/50">
-                <i class="fa-solid fa-cloud-arrow-up text-6xl text-slate-500 mb-4"></i>
-                <p>Drag & Drop CSV file here</p>
-                <input type="file" class="hidden">
+        <div class="tech-card max-w-2xl mx-auto p-10 rounded-xl text-center animate-fade-in">
+            <h2 class="text-3xl font-bold mb-2 text-white">UPLOAD DATABASE</h2>
+            <p class="text-slate-400 mb-8">Supported formats: .csv, .xlsx</p>
+            
+            <!-- Drop Zone -->
+            <div id="drop-zone" class="border-2 border-dashed border-slate-600 hover:border-cyan-400 rounded-xl p-10 transition-all cursor-pointer bg-slate-900/50 group relative">
+                
+                <input type="file" class="hidden" id="file-input" accept=".csv, .xlsx, .xls">
+                
+                <div id="upload-ui-default">
+                    <i class="fa-solid fa-cloud-arrow-up text-6xl text-slate-500 group-hover:text-cyan-400 transition-colors mb-4"></i>
+                    <p class="text-lg text-slate-300">Drag & Drop file here</p>
+                    <p class="text-sm text-slate-500 mt-2">or click to browse</p>
+                </div>
+
+                <!-- Selected File UI (Hidden by default) -->
+                <div id="upload-ui-selected" class="hidden">
+                    <i class="fa-solid fa-file-csv text-6xl text-cyan-400 mb-4"></i>
+                    <p id="file-name" class="text-lg text-white font-bold break-all"></p>
+                    <p class="text-sm text-green-400 mt-2"><i class="fa-solid fa-check"></i> Ready to upload</p>
+                </div>
+
+                <!-- Loading Overlay -->
+                <div id="upload-loading" class="absolute inset-0 bg-slate-900/90 flex flex-col items-center justify-center hidden rounded-xl">
+                    <i class="fa-solid fa-circle-notch fa-spin text-4xl text-cyan-400 mb-4"></i>
+                    <p class="text-cyan-400 animate-pulse">Processing Data...</p>
+                </div>
             </div>
+
+            <div id="status-message" class="mt-4 h-6 text-sm"></div>
+
+            <button id="upload-btn" disabled class="mt-6 bg-slate-700 text-slate-400 cursor-not-allowed px-8 py-3 rounded font-bold transition-all w-full">
+                IMPORT DATA
+            </button>
         </div>
     `;
+
+    // --- DOM Elements ---
+    const dropZone = document.getElementById('drop-zone');
+    const fileInput = document.getElementById('file-input');
+    const uiDefault = document.getElementById('upload-ui-default');
+    const uiSelected = document.getElementById('upload-ui-selected');
+    const fileNameDisplay = document.getElementById('file-name');
+    const uploadBtn = document.getElementById('upload-btn');
+    const statusMsg = document.getElementById('status-message');
+    const loadingOverlay = document.getElementById('upload-loading');
+
+    let selectedFile = null;
+
+    // --- Helper: Update UI State ---
+    const updateUI = () => {
+        if (selectedFile) {
+            uiDefault.classList.add('hidden');
+            uiSelected.classList.remove('hidden');
+            fileNameDisplay.innerText = selectedFile.name;
+            
+            // Enable Button
+            uploadBtn.disabled = false;
+            uploadBtn.classList.remove('bg-slate-700', 'text-slate-400', 'cursor-not-allowed');
+            uploadBtn.classList.add('bg-cyan-600', 'hover:bg-cyan-500', 'text-white', 'cursor-pointer');
+            statusMsg.innerText = '';
+        } else {
+            uiDefault.classList.remove('hidden');
+            uiSelected.classList.add('hidden');
+            
+            // Disable Button
+            uploadBtn.disabled = true;
+            uploadBtn.classList.add('bg-slate-700', 'text-slate-400', 'cursor-not-allowed');
+            uploadBtn.classList.remove('bg-cyan-600', 'hover:bg-cyan-500', 'text-white', 'cursor-pointer');
+        }
+    };
+
+    // --- Event Listeners ---
+
+    // 1. Click to Browse
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    // 2. File Selected
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            selectedFile = e.target.files[0];
+            updateUI();
+        }
+    });
+
+    // 3. Drag & Drop Visuals
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.add('border-cyan-400', 'bg-slate-800');
+        }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.remove('border-cyan-400', 'bg-slate-800');
+        }, false);
+    });
+
+    // 4. Drop Action
+    dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files.length > 0) {
+            selectedFile = files[0];
+            updateUI();
+        }
+    });
+
+    // 5. Upload Action (API Call)
+    uploadBtn.addEventListener('click', async (e) => {
+        e.stopPropagation(); // Prevent triggering dropZone click
+        if (!selectedFile) return;
+
+        // Show Loading
+        loadingOverlay.classList.remove('hidden');
+        statusMsg.innerText = '';
+        uploadBtn.disabled = true;
+
+        try {
+            // Prepare FormData
+            // The API expects the field name "file"
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+
+            // POST /api/v1/admin/import
+            await apiCall('/admin/import', {
+                method: 'POST',
+                body: formData // Body is FormData, apiCall handles Content-Type
+            });
+
+            // Success
+            loadingOverlay.classList.add('hidden');
+            container.innerHTML = `
+                <div class="tech-card max-w-lg mx-auto p-10 rounded-xl text-center animate-fade-in">
+                    <div class="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <i class="fa-solid fa-check text-4xl text-green-400"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold text-white mb-2">Import Successful</h2>
+                    <p class="text-slate-400 mb-6">The database has been updated with ${selectedFile.name}.</p>
+                    <button onclick="navigateTo('search')" class="bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-2 rounded">
+                        View Users
+                    </button>
+                    <button onclick="navigateTo('upload')" class="block w-full mt-4 text-slate-500 hover:text-white text-sm">
+                        Upload Another
+                    </button>
+                </div>
+            `;
+
+        } catch (error) {
+            // Error Handling
+            loadingOverlay.classList.add('hidden');
+            uploadBtn.disabled = false;
+            statusMsg.innerHTML = `<span class="text-red-400"><i class="fa-solid fa-triangle-exclamation"></i> ${error.message}</span>`;
+            console.error(error);
+        }
+    });
 }
 
 // 3. USER SEARCH (REAL API)
