@@ -50,5 +50,12 @@ services:
       - db
       - redis
 
+  frontend:
+    build: ./frontend_2
+    ports:
+      - "3000:8080"  # Map your machine's 3000 to container's 8080
+    depends_on:
+      - api
+
 volumes:
   pgdata:
