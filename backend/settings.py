@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     PORT: int = 8000
     DEBUG: bool = True
 
+    GEMINI_API_KEY: str ="<gemini_api_key>"
+
     SECRET_KEY: str = "329cd225b19f49a281b0fd4f046b084b5c80184dd71b98f66a88e8232e1be599"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30

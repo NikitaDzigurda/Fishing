@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 
 class AuthorSearchEngine:
-    def __init__(self, model_name: str = 'intfloat/multilingual-e5-base'):
+    def __init__(self, model_name: str = 'intfloat/multilingual-e5-small'):
         """
         Инициализация движка.
         model_name: название модели с HuggingFace. 

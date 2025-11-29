@@ -1,5 +1,5 @@
+from backend.service.recommendations.vector_db import AuthorSearchEngine
 import google.generativeai as genai
-from vector_db import AuthorSearchEngine
 from typing import Dict, List
 import datetime
 import json
