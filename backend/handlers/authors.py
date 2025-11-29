@@ -29,23 +29,16 @@ async def read_my_profile(
     return ProfileRead.model_validate(profile)
 
 
-# 👇 ПЕРЕМЕСТИЛИ ЭТОТ БЛОК ВВЕРХ (ДО /{id})
-@router.get("/search")
+@router.get("/search", response_model=list[ProfileRead])
 async def search_profiles(
     q: str = Query(..., min_length=1, description="Search by name, university, major, or bio"),
     limit: int = 20,
     offset: int = 0,
     service: SearchService = Depends(get_search_service)
 ):
-    """
-    Search strictly within User Profiles.
-    """
-    # Обрати внимание: возвращаемое значение должно соответствовать схеме,
-    # если ты хочешь валидацию ответа, добавь response_model=List[ProfileRead] в декоратор
     return await service.search_profiles(query=q, limit=limit, offset=offset)
 
 
-# 👇 ТЕПЕРЬ /{id} СТОИТ НИЖЕ /search
 @router.get("/{id}", response_model=ProfileRead)
 async def read_profile_by_id(id: int, db: AsyncSession = Depends(get_db)):
     profile = await get_profile_by_user_id(db, id)
@@ -70,10 +63,21 @@ async def create_my_profile(
             detail="Profile already exists. Use PUT to update."
         )
 
+    # 👇 Явная передача всех аргументов
     profile = await create_profile(
-        db,
+        db=db,
         user_id=current_user.id,
-        **payload.model_dump()
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+        bio=payload.bio,
+        major=payload.major,
+        university=payload.university,
+        contact_info=payload.contact_info,
+        google_scholar_id=payload.google_scholar_id,
+        scopus_id=payload.scopus_id,
+        orcid=payload.orcid,
+        arxiv_name=payload.arxiv_name,
+        semantic_scholar_id=payload.semantic_scholar_id
     )
     return ProfileRead.model_validate(profile)
 
@@ -85,9 +89,19 @@ async def update_my_profile(
         db: AsyncSession = Depends(get_db)
 ):
     profile = await create_or_update_profile(
-        db,
+        db=db,
         user_id=current_user.id,
-        **payload.model_dump()
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+        bio=payload.bio,
+        major=payload.major,
+        university=payload.university,
+        contact_info=payload.contact_info,
+        google_scholar_id=payload.google_scholar_id,
+        scopus_id=payload.scopus_id,
+        orcid=payload.orcid,
+        arxiv_name=payload.arxiv_name,
+        semantic_scholar_id=payload.semantic_scholar_id
     )
     return ProfileRead.model_validate(profile)
 

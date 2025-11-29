@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from sqlalchemy import Column, String, Boolean, Integer, DateTime, Text, ForeignKey, JSON
+from sqlalchemy.dialects.postgresql import ARRAY as PG_ARRAY
+
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 
@@ -32,6 +34,7 @@ class UserProfile(Base):
     bio = Column(Text, nullable=True)
     major = Column(String(200), nullable=True)
     university = Column(String(300), nullable=True)
+    contact_info = Column(String(300), nullable=True)
 
     google_scholar_id = Column(String(100), nullable=True)
     scopus_id = Column(String(100), nullable=True)
@@ -66,9 +69,9 @@ class Article(Base):
 
     citations = Column(Integer, default=0)
 
-    author_user_ids = Column(JSON, default=list, nullable=False)
+    author_user_ids = Column(PG_ARRAY(Integer), default=list, nullable=False)
 
-    authors_list = Column(JSON, default=list, nullable=False)
+    authors_list = Column(PG_ARRAY(String), default=list, nullable=False)
 
     source = Column(String(100), nullable=True)
     external_id = Column(String(255), nullable=True)

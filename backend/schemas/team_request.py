@@ -3,12 +3,24 @@ from typing import List, Optional
 from datetime import datetime
 
 
+class RequestAuthor(BaseModel):
+    id: int
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    major: Optional[str] = None
+    contact_info: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class RecommendedUser(BaseModel):
     id: int
     email: str
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     major: Optional[str] = None
+    contact_info: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -36,6 +48,8 @@ class TeamRequestRead(TeamRequestBase):
     user_id: int
     is_active: bool
     created_at: datetime
+
+    author_details: Optional[RequestAuthor] = None
 
     recommended_user_ids: List[int] = []
     recommendations_details: Optional[List[RecommendedUser]] = None

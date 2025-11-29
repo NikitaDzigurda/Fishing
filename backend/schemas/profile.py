@@ -13,6 +13,7 @@ class ProfileBase(BaseModel):
     bio: Optional[str] = Field(None, max_length=2000)
     major: Optional[str] = Field(None, max_length=200)
     university: Optional[str] = Field(None, max_length=300)
+    contact_info: Optional[str] = Field(None, max_length=300)
 
     # Идентификаторы (теперь они доступны для редактирования)
     google_scholar_id: Optional[str] = Field(None, max_length=100)

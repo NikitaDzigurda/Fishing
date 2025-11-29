@@ -1,9 +1,6 @@
-# backend/routers/articles.py
-
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import desc, select, func
-from sqlalchemy.dialects.postgresql import JSONB
 from typing import Optional
 from pydantic import BaseModel
 from datetime import datetime
@@ -13,7 +10,7 @@ from backend.models import User, UserProfile, Article
 from backend.dependencies import get_current_user
 from backend.tasks import parse_user_publications
 
-router = APIRouter(prefix="/articles", tags=["articles"])
+router = APIRouter(prefix="/api/v1/articles", tags=["articles"])
 
 
 class ArticleResponse(BaseModel):
@@ -65,12 +62,11 @@ async def get_user_articles(
         raise HTTPException(status_code=404, detail="Profile not found")
 
     # --- 2. Запрашиваем статьи ---
-    # 👇 Исправлено: приводим JSON к JSONB для использования contains()
 
-    # total - используем func.count для эффективности
+    # 👇 ИСПРАВЛЕНО: Оставили только один запрос, без cast(JSONB)
     total_result = await db.execute(
         select(func.count(Article.id)).where(
-            Article.author_user_ids.cast(JSONB).contains([user_id])
+            Article.author_user_ids.contains([user_id])
         )
     )
     total = total_result.scalar() or 0
@@ -78,7 +74,7 @@ async def get_user_articles(
     # сами статьи
     articles_result = await db.execute(
         select(Article)
-        .where(Article.author_user_ids.cast(JSONB).contains([user_id]))
+        .where(Article.author_user_ids.contains([user_id]))
         .order_by(desc(Article.citations))
         .offset(skip)
         .limit(limit)
