@@ -427,26 +427,47 @@ function renderProfileView(container, profile, isOwnProfile) {
     const fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim();
     const majors = profile.major ? profile.major.split(',') : ['General Science'];
     
-    // Check for metrics
+    // ИСПРАВЛЕНИЕ: Проверяем, что хотя бы одно поле существует (не null и не undefined), чтобы
+    // отобразить блок индексов, даже если все значения равны 0.
     const hasIndices = (
-        (profile.citations_total != null) ||
-        (profile.h_index != null) ||
-        (profile.publication_count != null)
+        (profile.citations_total !== undefined && profile.citations_total !== null) ||
+        (profile.citations_recent !== undefined && profile.citations_recent !== null) ||
+        (profile.h_index !== undefined && profile.h_index !== null) ||
+        (profile.i10_index !== undefined && profile.i10_index !== null) ||
+        (profile.publication_count !== undefined && profile.publication_count !== null)
     );
     
     const indicesHtml = hasIndices ? `
         <div class="flex gap-5 mt-4 py-3 border-t border-b border-slate-800 flex-wrap justify-center md:justify-start">
-            ${(profile.citations_total != null) ? `<div class="text-center"><div class="text-xs text-slate-400 uppercase">Total Citations</div><div class="font-bold text-cyan-300">${profile.citations_total}</div></div>` : ''}
-            ${(profile.h_index != null) ? `<div class="text-center"><div class="text-xs text-slate-400 uppercase">h-index</div><div class="font-bold text-cyan-300">${profile.h_index}</div></div>` : ''}
-            ${(profile.publication_count != null) ? `<div class="text-center"><div class="text-xs text-slate-400 uppercase">Publications</div><div class="font-bold text-cyan-300">${profile.publication_count}</div></div>` : ''}
+            ${(profile.citations_total !== undefined && profile.citations_total !== null) ? `<div class="text-center">
+                <div class="text-xs text-slate-400 uppercase">Total Citations</div>
+                <div class="font-bold text-cyan-300">${profile.citations_total}</div>
+            </div>` : ''}
+            ${(profile.citations_recent !== undefined && profile.citations_recent !== null) ? `<div class="text-center">
+                <div class="text-xs text-slate-400 uppercase">Recent Citations</div>
+                <div class="font-bold text-cyan-300">${profile.citations_recent}</div>
+            </div>` : ''}
+            ${(profile.h_index !== undefined && profile.h_index !== null) ? `<div class="text-center">
+                <div class="text-xs text-slate-400 uppercase">h-index</div>
+                <div class="font-bold text-cyan-300">${profile.h_index}</div>
+            </div>` : ''}
+            ${(profile.i10_index !== undefined && profile.i10_index !== null) ? `<div class="text-center">
+                <div class="text-xs text-slate-400 uppercase">i10-index</div>
+                <div class="font-bold text-cyan-300">${profile.i10_index}</div>
+            </div>` : ''}
+            ${(profile.publication_count !== undefined && profile.publication_count !== null) ? `<div class="text-center">
+                <div class="text-xs text-slate-400 uppercase">Publications</div>
+                <div class="font-bold text-cyan-300">${profile.publication_count}</div>
+            </div>` : ''}
         </div>
     ` : '';
 
-    // Optional Fields
+    // Контакты: показываем только заполненные необязательные поля
     const optionalIds = ['google_scholar_id','scopus_id','orcid','arxiv_name','semantic_scholar_id'];
     const optionalHtml = optionalIds.map(k => {
         if (profile[k]) {
-            const displayKey = k.replace(/_/g,' ').toUpperCase();
+            // Переводим только отображаемое имя
+            const displayKey = k.replace(/_/g,' ').replace('scholar id', 'Scholar ID').replace('arxiv name', 'arXiv Name').replace('orcid', 'ORCID').replace('scopus id', 'Scopus ID').replace('semantic scholar id', 'Semantic Scholar ID');
             return `<p class="text-slate-300 text-sm"><strong>${displayKey}:</strong> ${profile[k]}</p>`;
         }
         return '';
