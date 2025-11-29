@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Hackathon 2025</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="flex items-center justify-center min-h-screen text-white relative">
+
+    <div id="tech-bg-container" class="tech-bg"><div class="tech-lines"></div></div>
+
+    <main class="w-full max-w-lg p-4 z-10">
+        <!-- Логотипы -->
+        <div class="flex justify-center mb-6 opacity-80 gap-4">
+             <i class="fa-solid fa-atom text-4xl text-cyan-400"></i>
+             <div class="text-center orbitron-font font-bold">SIRIUS<br><span class="text-xs text-slate-400">ACCESS CONTROL</span></div>
+        </div>
+
+        <div class="tech-card w-full p-1 pt-1 rounded-xl relative">
+            <div class="corner-accent tl"></div>
+            <div class="corner-accent tr"></div>
+            <div class="corner-accent bl"></div>
+            <div class="corner-accent br"></div>
+
+            <div class="p-8 md:p-12 flex flex-col items-center text-center">
+                
+                <h2 class="text-3xl font-bold text-cyan-400 mb-2 neon-text">SYSTEM LOGIN</h2>
+                <!-- Перевод: ВХОД В СИСТЕМУ -->
+                <h4 class="text-sm tracking-widest font-light mb-8 text-slate-300">ACCESS INITIATED</h4>
+
+                <!-- НОВОЕ: Блок сообщения об успехе (Скрыт по умолчанию классом hidden) -->
+                <div id="success-message" class="hidden w-full mb-6 bg-green-900/30 border border-green-500/50 rounded-lg p-3 items-center gap-3 animate-pulse">
+                    <i class="fa-solid fa-circle-check text-green-400 text-xl"></i>
+                    <div class="text-left">
+                        <!-- Перевод: РЕГИСТРАЦИЯ УСПЕШНА -->
+                        <div class="text-green-400 font-bold text-sm">REGISTRATION SUCCESSFUL</div>
+                        <!-- Перевод: Введите данные для входа -->
+                        <!-- Этот текст будет заменен JS (initLogin), но оставим как запасной -->
+                        <div class="text-green-200 text-xs">Please log in with your new credentials.</div>
+                    </div>
+                </div>
+
+                <form class="w-full flex flex-col gap-5" onsubmit="event.preventDefault(); handleLogin();">
+                    <div class="tech-input-group flex items-center bg-slate-900/50 border-2 border-slate-600 rounded-full px-4 py-3">
+                        <i class="fa-solid fa-user text-cyan-400 text-lg w-8"></i>
+                        <!-- Перевод плейсхолдера: ЛОГИН -->
+                        <input id="login-input" type="text" placeholder="LOGIN" class="bg-transparent border-none outline-none text-white w-full placeholder-slate-400 font-medium tracking-wider pl-2 focus:ring-0">
+                    </div>
+
+                    <div class="tech-input-group flex items-center bg-slate-900/50 border-2 border-slate-600 rounded-full px-4 py-3">
+                        <i class="fa-solid fa-key text-cyan-400 text-lg w-8"></i>
+                        <!-- Перевод плейсхолдера: ПАРОЛЬ -->
+                        <input id="pass-input" type="password" placeholder="PASSWORD" class="bg-transparent border-none outline-none text-white w-full placeholder-slate-400 font-medium tracking-wider pl-2 focus:ring-0">
+                    </div>
+
+                    <button id="btn-login" type="submit" class="btn-glow btn-text w-full py-4 mt-4 rounded-xl text-xl font-bold text-black tracking-widest uppercase relative overflow-hidden group">
+                        <!-- Перевод текста кнопки: ВОЙТИ -->
+                        <span class="relative z-10">LOG IN</span>
+                        <div class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                    </button>
+                </form>
+
+                <div class="mt-6 text-sm text-slate-400">
+                    <!-- Перевод: Нет аккаунта? Зарегистрироваться -->
+                    Don't have an account? <a href="register.html" class="text-cyan-400 hover:text-white underline transition-colors">Register</a>
+                </div>
+
+                <div class="w-full flex items-center justify-between mt-8 pt-4 border-t border-slate-700/50">
+                    <div class="text-slate-500 text-xs">Secure Connection v2.0</div>
+                    <button id="btn-guest" onclick="handleGuest()" class="text-slate-300 hover:text-cyan-300 transition-colors font-bold text-sm flex items-center gap-2 border border-slate-600 px-4 py-1 rounded hover:border-cyan-400">
+                        <i class="fa-solid fa-user-secret"></i> GUEST MODE
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <script src="bg-effects.js"></script>
+    <script src="logic.js"></script>
+</body>
+</html>

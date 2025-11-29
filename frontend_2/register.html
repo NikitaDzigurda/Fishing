@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 1. Перевод заголовка -->
+    <title>Registration - Hackathon 2025</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="flex items-center justify-center min-h-screen text-white relative">
+
+    <div id="tech-bg-container" class="tech-bg"><div class="tech-lines"></div></div>
+
+    <main class="w-full max-w-lg p-4 z-10">
+        <!-- Логотипы (упрощенные) -->
+        <div class="flex justify-center mb-6 opacity-80 gap-4">
+            <i class="fa-solid fa-atom text-4xl text-cyan-400"></i>
+            <div class="text-center orbitron-font font-bold">SIRIUS<br><span class="text-xs text-slate-400">REGISTRATION UNIT</span></div>
+        </div>
+
+        <div class="tech-card w-full p-1 pt-1 rounded-xl relative">
+            <div class="corner-accent tl"></div>
+            <div class="corner-accent tr"></div>
+            <div class="corner-accent bl"></div>
+            <div class="corner-accent br"></div>
+
+            <div class="p-8 md:p-12 flex flex-col items-center text-center">
+                <h1 class="text-2xl font-bold tracking-wide text-white mb-1 neon-text">YOUNG SCIENTISTS</h1>
+                <h2 class="text-xl font-bold tracking-widest text-cyan-400 mb-6">HACKATHON 2025</h2>
+
+                <div id="error-message-reg" 
+                    class="hidden w-full p-3 mb-4 text-sm font-medium text-red-400 bg-red-900/50 border border-red-700 rounded-lg text-left"
+                    role="alert" style="box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);">
+                    <!-- 2. Перевод ОШИБКА -->
+                    <span class="font-bold mr-2">ERROR:</span> 
+                    <span id="error-text-reg"></span>
+                </div>
+
+                <form class="w-full flex flex-col gap-5" onsubmit="event.preventDefault(); handleRegister();">
+                    <div class="tech-input-group flex items-center bg-slate-900/50 border-2 border-slate-600 rounded-full px-4 py-3">
+                        <i class="fa-solid fa-user-plus text-cyan-400 text-lg w-8"></i>
+                        <!-- 3. Перевод плейсхолдера -->
+                        <input id="reg-login" type="text" placeholder="NEW LOGIN" class="bg-transparent border-none outline-none text-white w-full placeholder-slate-400 font-medium tracking-wider pl-2 focus:ring-0">
+                    </div>
+
+                    <div class="tech-input-group flex items-center bg-slate-900/50 border-2 border-slate-600 rounded-full px-4 py-3">
+                        <i class="fa-solid fa-lock text-cyan-400 text-lg w-8"></i>
+                        <!-- 3. Перевод плейсхолдера -->
+                        <input id="reg-pass" type="password" placeholder="CHOOSE PASSWORD" class="bg-transparent border-none outline-none text-white w-full placeholder-slate-400 font-medium tracking-wider pl-2 focus:ring-0">
+                    </div>
+
+                    <button id="btn-register" type="submit" class="btn-glow btn-text w-full py-4 mt-4 rounded-xl text-xl font-bold text-black tracking-widest uppercase relative overflow-hidden group">
+                        <span class="relative z-10">REGISTER</span>
+                        <div class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                    </button>
+
+                </form>
+
+                <!-- 4. ДОБАВЛЕНА ПРОПУЩЕННАЯ ССЫЛКА ВОССТАНОВЛЕНИЯ/ВХОДА -->
+                <div class="mt-6 text-sm text-slate-400">
+                    Already have an account? <a href="login.html" class="text-cyan-400 hover:text-white underline transition-colors">Log In</a>
+                </div>
+
+            </div>
+            
+            <!-- Этот блок остается вне p-8/p-12, как было в оригинале, чтобы иметь разделительную линию -->
+            <div class="w-full flex items-center justify-between px-8 md:px-12 pb-8 md:pb-12 mt-8 pt-4 border-t border-slate-700/50">
+                <div class="text-slate-500 text-xs">Nov 28-29, 2025</div>
+                <button id="btn-guest" onclick="handleGuest()" class="text-slate-300 hover:text-cyan-300 transition-colors font-bold text-sm flex items-center gap-2 border border-slate-600 px-4 py-1 rounded hover:border-cyan-400">
+                    <i class="fa-solid fa-user-secret"></i> GUEST MODE
+                </button>
+            </div>
+
+        </div>
+    </main>
+    
+    <script src="bg-effects.js"></script>
+    <script src="logic.js"></script>
+</body>
+</html>
