@@ -48,22 +48,18 @@ const setButtonLoading = (btn, isLoading, originalText = 'SUBMIT') => { // Ус�
     }
 };
 
+// В файле logic.js найди функцию saveSession и убедись, что она выглядит так:
+
 const saveSession = (type, email, tokens = null) => {
-    console.log(type, email, tokens);
-    // Мета-данные пользователя храним в localStorage для удобства UI
+    // Мета-данные
     localStorage.setItem('userType', type);
-    localStorage.setItem('username', email);
+    localStorage.setItem('username', email); // Это важно для шапки!
 
-    // Токены сохраняем в Cookies
     if (tokens) {
-        // access_token живет, например, 1 день
         setCookie('access_token', tokens.access_token, 1);
-
-        // refresh_token живет дольше, например, 7 дней
         setCookie('refresh_token', tokens.refresh_token, 7);
     }
 };
-
 // --- ОСНОВНЫЕ ФУНКЦИИ ---
 
 // 1. Показать системное сообщение об ошибке (красное)
