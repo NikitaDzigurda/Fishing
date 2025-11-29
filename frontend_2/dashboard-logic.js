@@ -81,29 +81,59 @@ const getMockFeed = () => {
 
 // --- STATE MANAGEMENT ---
 
-let currentUserRole = 'guest'; 
+let currentUserRole = 'guest'; // Defaults to guest until API confirms
 let currentTab = 'home';
 
 // --- CORE RENDER FUNCTIONS ---
 
-function initDashboardUI() {
-    const type = localStorage.getItem('userType');
-    const name = localStorage.getItem('username'); // This is Email
+// NEW: Async initialization that checks the API
+async function initDashboardUI() {
+    const nameEl = document.getElementById('user-name');
+    const roleEl = document.getElementById('user-role');
+    const container = document.getElementById('main-content');
 
-    if (!type) {
+    // 1. Visual Loading State in Sidebar
+    if (nameEl) nameEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
+    
+    try {
+        // 2. Call API: GET /api/v1/auth/me
+        // Note: apiCall automatically redirects to login.html if it gets a 401
+        const userData = await apiCall('/auth/me');
+
+        if (!userData) return; // Stop if redirecting or error
+
+        // 3. Determine Role
+        // API returns: { id: 1, email: "...", role: "admin" | "observer", is_active: true }
+        if (userData.role === 'admin') {
+            currentUserRole = 'admin';
+        } else {
+            // Treat 'observer' or any future roles as standard 'user' for now
+            currentUserRole = 'user';
+        }
+
+        // 4. Update Sidebar Info
+        if (nameEl) nameEl.innerText = userData.email;
+        if (roleEl) {
+            roleEl.innerText = userData.role.toUpperCase();
+            
+            // Color coding for role
+            roleEl.className = 'text-xs truncate font-bold ' + 
+                (userData.role === 'admin' ? 'text-red-400' : 'text-cyan-400');
+        }
+
+        // 5. Store user ID/Email for other functions (like profile view)
+        localStorage.setItem('userId', userData.id);
+        localStorage.setItem('username', userData.email);
+
+        // 6. Render Dashboard
+        renderNavigation();
+        navigateTo('home');
+
+    } catch (error) {
+        console.error("Initialization Failed:", error);
+        // Fallback to login if something critical fails
         window.location.href = 'login.html';
-        return;
     }
-
-    // Role Logic
-    if (type === 'user') {
-        currentUserRole = 'user';
-    } else {
-        currentUserRole = 'guest';
-    }
-
-    renderNavigation();
-    navigateTo('home');
 }
 
 function renderNavigation() {
@@ -123,18 +153,22 @@ function renderNavigation() {
         nav.appendChild(btn);
     };
 
+    // --- DYNAMIC NAVIGATION BASED ON API ROLE ---
+    
     if (currentUserRole === 'admin') {
+        // ADMIN DASHBOARD
         createBtn('home', 'fa-chart-line', 'ANALYTICS', () => navigateTo('home'));
         createBtn('upload', 'fa-file-csv', 'UPLOAD CSV', () => navigateTo('upload'));
         createBtn('search', 'fa-magnifying-glass', 'USER BASE', () => navigateTo('search'));
-    } else if (currentUserRole === 'user') {
+    } 
+    else {
+        // OBSERVER / USER DASHBOARD
         createBtn('home', 'fa-list-check', 'REQUESTS FEED', () => navigateTo('home'));
-        createBtn('create', 'fa-plus', 'NEW REQUEST', () => navigateTo('create'));
         createBtn('search', 'fa-users', 'FIND SCIENTISTS', () => navigateTo('search'));
         createBtn('profile', 'fa-id-card', 'MY PROFILE', () => navigateTo('profile'));
-    } else {
-        createBtn('home', 'fa-eye', 'PUBLIC FEED', () => navigateTo('home'));
-        createBtn('search', 'fa-magnifying-glass', 'USER SEARCH', () => navigateTo('search'));
+        
+        // Example: Only show "New Request" if they have a specific permission (optional)
+        // createBtn('create', 'fa-plus', 'NEW REQUEST', () => navigateTo('create'));
     }
 }
 
@@ -147,8 +181,12 @@ function navigateTo(tab) {
     setTimeout(() => {
         switch (tab) {
             case 'home':
-                if (currentUserRole === 'admin') renderAdminDashboard(container);
-                else renderFeed(container);
+                // Logic switches based on the role determined in initDashboardUI
+                if (currentUserRole === 'admin') {
+                    renderAdminDashboard(container);
+                } else {
+                    renderFeed(container);
+                }
                 break;
             case 'upload':
                 renderUpload(container);
@@ -160,7 +198,7 @@ function navigateTo(tab) {
                 renderCreateRequest(container);
                 break;
             case 'profile':
-                // Load own profile
+                // Loads the profile of the currently logged in user
                 loadOwnProfile(container);
                 break;
         }
@@ -168,7 +206,6 @@ function navigateTo(tab) {
         container.style.opacity = 1;
     }, 100);
 }
-
 // --- TAB CONTENT RENDERERS ---
 
 // 1. ADMIN DASHBOARD (Mocked)
