@@ -94,53 +94,73 @@ let currentTab = 'home';
 
 // --- CORE RENDER FUNCTIONS ---
 
-// NEW: Async initialization that checks the API
 async function initDashboardUI() {
     const nameEl = document.getElementById('user-name');
     const roleEl = document.getElementById('user-role');
-    const container = document.getElementById('main-content');
-
-    // 1. Visual Loading State in Sidebar
-    if (nameEl) nameEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
     
+    // 1. Check LocalStorage for User Type
+    const storedType = localStorage.getItem('userType');
+
+    // --- CASE A: GUEST MODE ---
+    if (storedType === 'guest') {
+        currentUserRole = 'guest';
+        
+        // Update Sidebar for Guest
+        if (nameEl) nameEl.innerText = 'Guest User';
+        if (roleEl) {
+            roleEl.innerText = 'GUEST ACCESS';
+            roleEl.className = 'text-xs truncate font-bold text-slate-500';
+        }
+
+        renderNavigation();
+        navigateTo('home');
+        return; // STOP HERE! Do not call API.
+    }
+
+    // --- CASE B: AUTHENTICATED USER ---
+    // If not guest, but no token, force login
+    if (!getCookie('access_token')) {
+        window.location.href = 'login.html';
+        return;
+    }
+
+    // Visual Loading State
+    if (nameEl) nameEl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
+
     try {
-        // 2. Call API: GET /api/v1/auth/me
-        // Note: apiCall automatically redirects to login.html if it gets a 401
+        // Call API: GET /api/v1/auth/me
         const userData = await apiCall('/auth/me');
 
-        if (!userData) return; // Stop if redirecting or error
+        if (!userData) return; 
 
-        // 3. Determine Role
-        // API returns: { id: 1, email: "...", role: "admin" | "observer", is_active: true }
+        // Determine Role
         if (userData.role === 'admin') {
             currentUserRole = 'admin';
         } else {
-            // Treat 'observer' or any future roles as standard 'user' for now
-            currentUserRole = 'user';
+            currentUserRole = 'user'; // 'observer' or 'user'
         }
 
-        // 4. Update Sidebar Info
+        // Update Sidebar Info
         if (nameEl) nameEl.innerText = userData.email;
         if (roleEl) {
             roleEl.innerText = userData.role.toUpperCase();
-            
-            // Color coding for role
             roleEl.className = 'text-xs truncate font-bold ' + 
                 (userData.role === 'admin' ? 'text-red-400' : 'text-cyan-400');
         }
 
-        // 5. Store user ID/Email for other functions (like profile view)
+        // Store user ID/Email
         localStorage.setItem('userId', userData.id);
         localStorage.setItem('username', userData.email);
 
-        // 6. Render Dashboard
         renderNavigation();
         navigateTo('home');
 
     } catch (error) {
         console.error("Initialization Failed:", error);
-        // Fallback to login if something critical fails
-        window.location.href = 'login.html';
+        // Only redirect if it's strictly an Auth error, otherwise alert
+        if(error.message.includes('401')) {
+            window.location.href = 'login.html';
+        }
     }
 }
 
@@ -161,25 +181,27 @@ function renderNavigation() {
         nav.appendChild(btn);
     };
 
-    // --- DYNAMIC NAVIGATION BASED ON API ROLE ---
+    // --- DYNAMIC NAVIGATION ---
     
     if (currentUserRole === 'admin') {
-        // ADMIN DASHBOARD
+        // ADMIN
         createBtn('home', 'fa-chart-line', 'ANALYTICS', () => navigateTo('home'));
         createBtn('upload', 'fa-file-csv', 'UPLOAD CSV', () => navigateTo('upload'));
         createBtn('search', 'fa-magnifying-glass', 'USER BASE', () => navigateTo('search'));
     } 
-    else {
-        // OBSERVER / USER DASHBOARD
+    else if (currentUserRole === 'user') {
+        // AUTHENTICATED USER (Observer/User)
         createBtn('home', 'fa-list-check', 'REQUESTS FEED', () => navigateTo('home'));
         createBtn('search', 'fa-users', 'FIND SCIENTISTS', () => navigateTo('search'));
         createBtn('profile', 'fa-id-card', 'MY PROFILE', () => navigateTo('profile'));
-        
-        // Example: Only show "New Request" if they have a specific permission (optional)
-        // createBtn('create', 'fa-plus', 'NEW REQUEST', () => navigateTo('create'));
+    } 
+    else {
+        // GUEST (Restricted Access)
+        createBtn('home', 'fa-eye', 'PUBLIC FEED', () => navigateTo('home'));
+        createBtn('search', 'fa-magnifying-glass', 'USER SEARCH', () => navigateTo('search'));
+        // Guest does NOT get 'MY PROFILE' or 'UPLOAD'
     }
 }
-
 function navigateTo(tab) {
     currentTab = tab;
     const container = document.getElementById('main-content');
